@@ -91,14 +91,14 @@ const loginPageTmpl = (rootUri) => {
   `;
 };
 
-function getSession(req, kvStore) {
+async function getSession(req, kvStore) {
   const sessionKey = getCookie(req, 'session_key');
-  return kvStore.get(`sessions/${sessionKey}`)
+  return await kvStore.get(`sessions/${sessionKey}`)
 }
 
 function createHandler(rootUri, kvStore) {
 
-  function handler(req) {
+  async function handler(req) {
 
     const url = new URL(req.url);
 
@@ -110,7 +110,7 @@ function createHandler(rootUri, kvStore) {
       case `${rootUri}/logout`: {
 
         const sessionKey = getCookie(req, 'session_key');
-        kvStore.delete(`sessions/${sessionKey}`)
+        await kvStore.delete(`sessions/${sessionKey}`)
 
         return new Response(null, {
           status: 303,
@@ -232,7 +232,7 @@ async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
 
   const url = new URL(req.url);
 
-  let app = kvStore.get(`apps/${serverDomain}`);
+  let app = await kvStore.get(`apps/${serverDomain}`);
 
   if (!app) {
     const redirectUri = `${url.origin}${rootUri}/callback`;
@@ -252,7 +252,7 @@ async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
 
     app = await res.json();
 
-    kvStore.set(`apps/${serverDomain}`, app);
+    await kvStore.set(`apps/${serverDomain}`, app);
   }
 
   const clientId = rootUri;
@@ -265,7 +265,7 @@ async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
     app,
   };
 
-  kvStore.set(`oauth_state/${state}`, authReq);
+  await kvStore.set(`oauth_state/${state}`, authReq);
 
   return new Response(null, {
     status: 303,
@@ -288,8 +288,8 @@ async function completeMastodonLogin(req, rootUri, kvStore) {
     });
   }
 
-  const authReq = kvStore.get(`oauth_state/${state}`);
-  kvStore.delete(`oauth_state/${state}`);
+  const authReq = await kvStore.get(`oauth_state/${state}`);
+  await kvStore.delete(`oauth_state/${state}`);
 
   if (!authReq) {
     throw new Error("No such auth request");
@@ -335,7 +335,7 @@ async function completeMastodonLogin(req, rootUri, kvStore) {
   };
 
   const sessionKey = genRandomText(32);
-  kvStore.set(`sessions/${sessionKey}`, session);
+  await kvStore.set(`sessions/${sessionKey}`, session);
 
   return new Response(null, {
     status: 303,

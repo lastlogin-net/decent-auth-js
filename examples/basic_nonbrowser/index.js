@@ -36,14 +36,14 @@ const kvStore = await createKvStore('./store.json');
 
 const lastloginHandler = lastlogin.createHandler(loginPrefix, kvStore);
 
-const handler = (req) => {
+const handler = async (req) => {
   const url = new URL(req.url);
 
   if (url.pathname.startsWith(loginPrefix)) {
     return lastloginHandler(req);
   }
 
-  const session = lastlogin.getSession(req, kvStore);
+  const session = await lastlogin.getSession(req, kvStore);
 
   if (session) {
     return new Response(`<h1>Hi there ${session.userId}</h1>\n<a href='${loginPrefix}/logout'>Logout</a>`,{
