@@ -30,11 +30,14 @@ async function createKvStore(path) {
 }
 
 const kvStore = await createKvStore('./store.json');
+//const kvStore = new lastlogin.KvStore();
 
 //kvStore.delete('sessions/');
 //kvStore.delete('oauth_state/');
 
-const lastloginHandler = lastlogin.createHandler(loginPrefix, kvStore);
+const lastloginHandler = lastlogin.createHandler(kvStore, {
+  prefix: loginPrefix, 
+});
 
 const handler = async (req) => {
   const url = new URL(req.url);

@@ -35,7 +35,8 @@ class KvStore {
   }
 
   persist() {
-    throw new Error("Not implemented");
+    // noop
+    console.log(this._obj);
   }
 }
 
@@ -96,7 +97,9 @@ async function getSession(req, kvStore) {
   return await kvStore.get(`sessions/${sessionKey}`)
 }
 
-function createHandler(pathPrefix, kvStore) {
+function createHandler(kvStore, opt) {
+
+  let pathPrefix = opt?.prefix;
 
   async function handler(req) {
 
