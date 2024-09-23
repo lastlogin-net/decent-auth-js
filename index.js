@@ -1,4 +1,5 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
+import { oidcLogin, oidcCallback } from './oauth2.js';
 
 
 class KvStore {
@@ -84,10 +85,15 @@ const loginPageTmpl = (pathPrefix) => {
 
     <h1>Login Page</h1>
 
-    <form action=${pathPrefix}/fediverse>
+    <form action=${pathPrefix}/login-fediverse>
       <label for='fediverse-id-input'>Fediverse ID</label>
       <input type='text' id='fediverse-id-input' name='id' />
       <button>Submit</button>
+    </form>
+
+    <form action=${pathPrefix}/login-oidc>
+      <input type='hidden' id='oidc-provider-uri-input' name='provider_uri' value='https://lastlogin.net'/>
+      <button>Login with LastLogin</button>
     </form>
 
     ${footerTmpl}
@@ -130,7 +136,15 @@ function createHandler(kvStore, opt) {
 
         break;
       }
-      case '/fediverse': {
+      case '/login-oidc': {
+        return oidcLogin(req, pathPrefix, kvStore);
+        break;
+      }
+      case '/oidc-callback': {
+        return oidcCallback(req, kvStore);
+        break;
+      }
+      case '/login-fediverse': {
         const res = fediversePage(req, pathPrefix, kvStore);
         return res;
         break;

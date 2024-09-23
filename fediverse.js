@@ -1,3 +1,5 @@
+import { genRandomText } from './utils.js';
+
 const FEDIVERSE_ID_TYPE_ACTIVITYPUB = 'activitypub';
 
 async function fediversePage(req, pathPrefix, kvStore) {
@@ -191,17 +193,6 @@ async function completeMastodonLogin(req, kvStore) {
   });
 }
 
-function genRandomText(len) {
-  const possible = "0123456789abcdefghijkmnpqrstuvwxyz";
-
-  let text = "";
-  for (let i = 0; i < len; i++) {
-    const randIndex = Math.floor(Math.random() * possible.length);
-    text += possible[randIndex];
-  }
-
-  return text;
-}
 
 export {
   fediversePage,
