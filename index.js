@@ -75,13 +75,13 @@ const footerTmpl = `
   </html>
 `;
 
-const loginPageTmpl = (rootUri) => {
+const loginPageTmpl = (pathPrefix) => {
   return `
     ${headerTmpl}
 
     <h1>Login Page</h1>
 
-    <form action=${rootUri}/fediverse>
+    <form action=${pathPrefix}/fediverse>
       <label for='fediverse-id-input'>Fediverse ID</label>
       <input type='text' id='fediverse-id-input' name='id' />
       <button>Submit</button>
@@ -96,18 +96,21 @@ async function getSession(req, kvStore) {
   return await kvStore.get(`sessions/${sessionKey}`)
 }
 
-function createHandler(rootUri, kvStore) {
+function createHandler(pathPrefix, kvStore) {
 
   async function handler(req) {
 
     const url = new URL(req.url);
 
-    switch (url.pathname) {
-      case `${rootUri}`: {
-        return loginPage(rootUri);
+    const pathname = url.pathname.slice(pathPrefix.length);
+    const path = pathname ? pathname : '/';
+
+    switch (path) {
+      case '/': {
+        return loginPage(pathPrefix);
         break;
       }
-      case `${rootUri}/logout`: {
+      case '/logout': {
 
         const sessionKey = getCookie(req, 'session_key');
         await kvStore.delete(`sessions/${sessionKey}`)
@@ -122,13 +125,13 @@ function createHandler(rootUri, kvStore) {
 
         break;
       }
-      case `${rootUri}/fediverse`: {
-        const res = fediversePage(req, rootUri, kvStore);
+      case '/fediverse': {
+        const res = fediversePage(req, pathPrefix, kvStore);
         return res;
         break;
       }
-      case `${rootUri}/callback`: {
-        return completeMastodonLogin(req, rootUri, kvStore);
+      case '/callback': {
+        return completeMastodonLogin(req, kvStore);
         break;
       }
       default: {
@@ -141,11 +144,11 @@ function createHandler(rootUri, kvStore) {
   return handler;
 }
 
-function loginPage(rootUri) {
-  return sendHtml(loginPageTmpl(rootUri));
+function loginPage(pathPrefix) {
+  return sendHtml(loginPageTmpl(pathPrefix));
 }
 
-async function fediversePage(req, rootUri, kvStore) {
+async function fediversePage(req, pathPrefix, kvStore) {
 
   const url = new URL(req.url);
   const params = new URLSearchParams(url.search);
@@ -161,7 +164,7 @@ async function fediversePage(req, rootUri, kvStore) {
         throw new Error("Not a mastodon server");
       }
 
-      const res = startMastodonLogin(req, parsedId.server, rootUri, kvStore);
+      const res = startMastodonLogin(req, parsedId.server, pathPrefix, kvStore);
       return res;
 
       break;
@@ -228,14 +231,14 @@ async function getNodeInfo(serverDomain) {
   return nodeInfo;
 }
 
-async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
+async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
 
   const url = new URL(req.url);
 
   let app = await kvStore.get(`apps/${serverDomain}`);
 
   if (!app) {
-    const redirectUri = `${url.origin}${rootUri}/callback`;
+    const redirectUri = `${url.origin}${pathPrefix}/callback`;
 
     const clientName = "LastLogin Client";
     const redirectUris = [ redirectUri ];
@@ -255,8 +258,6 @@ async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
     await kvStore.set(`apps/${serverDomain}`, app);
   }
 
-  const clientId = rootUri;
-
   const state = genRandomText(32);
   const authUri = `https://${serverDomain}/oauth/authorize?client_id=${app.client_id}&redirect_uri=${app.redirect_uri}&state=${state}&response_type=code&scope=read:accounts`;
 
@@ -275,7 +276,7 @@ async function startMastodonLogin(req, serverDomain, rootUri, kvStore) {
   });
 }
 
-async function completeMastodonLogin(req, rootUri, kvStore) {
+async function completeMastodonLogin(req, kvStore) {
 
   const url = new URL(req.url);
   const params = new URLSearchParams(url.search);
