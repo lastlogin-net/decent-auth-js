@@ -21,7 +21,7 @@ async function atprotoClientMetadata(req, pathPrefix) {
     response_types: [
       'code'
     ],
-    scope: 'atproto transition:generic',
+    scope: 'atproto',
     token_endpoint_auth_method: 'none',
   };
 
