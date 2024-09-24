@@ -81,7 +81,7 @@ async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
 
   const url = new URL(req.url);
 
-  let app = await kvStore.get(`apps/${serverDomain}`);
+  let app = await kvStore.get(`apps/${serverDomain}/${url.hostname}`);
 
   if (!app) {
     const redirectUri = `${url.origin}${pathPrefix}/callback`;
@@ -101,7 +101,7 @@ async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
 
     app = await res.json();
 
-    await kvStore.set(`apps/${serverDomain}`, app);
+    await kvStore.set(`apps/${serverDomain}/${url.hostname}`, app);
   }
 
   const state = genRandomText(32);

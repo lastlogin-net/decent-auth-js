@@ -1,4 +1,5 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
+import { atprotoLogin, atprotoClientMetadata } from './atproto.js';
 import { oidcLogin, oidcCallback } from './oauth2.js';
 
 
@@ -91,6 +92,12 @@ const loginPageTmpl = (pathPrefix) => {
       <button>Submit</button>
     </form>
 
+    <form action=${pathPrefix}/login-atproto>
+      <label for='atprodo-id-input'>ATProto ID</label>
+      <input type='text' id='atproto-id-input' name='id' />
+      <button>Submit</button>
+    </form>
+
     <form action=${pathPrefix}/login-oidc>
       <input type='hidden' id='oidc-provider-uri-input' name='provider_uri' value='https://lastlogin.net'/>
       <button>Login with LastLogin</button>
@@ -142,6 +149,17 @@ function createHandler(kvStore, opt) {
       }
       case '/oidc-callback': {
         return oidcCallback(req, kvStore);
+        break;
+      }
+      case '/login-atproto': {
+        return atprotoLogin(req, pathPrefix, kvStore);
+        break;
+      }
+      case '/atproto-callback': {
+        break;
+      }
+      case '/client-metadata.json': {
+        return atprotoClientMetadata(req, pathPrefix);
         break;
       }
       case '/login-fediverse': {
