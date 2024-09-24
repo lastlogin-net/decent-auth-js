@@ -14,9 +14,9 @@ async function fediversePage(req, pathPrefix, kvStore) {
     case FEDIVERSE_ID_TYPE_ACTIVITYPUB: {
       const nodeInfo = await getNodeInfo(parsedId.server);
 
-      if (nodeInfo.software.name !== 'mastodon') {
-        throw new Error("Not a mastodon server");
-      }
+      //if (nodeInfo.software.name !== 'mastodon') {
+      //  throw new Error("Not a mastodon server");
+      //}
 
       const res = startMastodonLogin(req, parsedId.server, pathPrefix, kvStore);
       return res;

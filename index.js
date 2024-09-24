@@ -1,6 +1,6 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
-import { atprotoLogin, atprotoClientMetadata } from './atproto.js';
-import { oidcLogin, oidcCallback } from './oauth2.js';
+import { atprotoLogin, atprotoClientMetadata, atprotoCallback } from './atproto.js';
+import { oidcLogin, oidcCallback } from './oidc.js';
 
 
 class KvStore {
@@ -156,6 +156,7 @@ function createHandler(kvStore, opt) {
         break;
       }
       case '/atproto-callback': {
+        return atprotoCallback(req, pathPrefix, kvStore);
         break;
       }
       case '/client-metadata.json': {
