@@ -1,12 +1,24 @@
 import { genRandomText } from './utils.js';
 import { generateChallengeData } from './oauth2.js';
+import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
 
 async function atprotoClientMetadata(req, pathPrefix) {
 
-  const url = new URL(req.url);
+  const clientMeta = getClientMeta(req.url, pathPrefix);
+
+  return new Response(JSON.stringify(clientMeta), {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+function getClientMeta(unparsedUrl, pathPrefix) {
+
+  const url = new URL(unparsedUrl);
 
   const clientMeta = {
-    client_id: `https://${url.hostname}${url.pathname}`,
+    client_id: `https://${url.hostname}${pathPrefix}/client-metadata.json`,
     application_type: 'web',
     client_name: 'Decent Auth Client',
     client_uri: `https://${url.hostname}`,
@@ -25,11 +37,7 @@ async function atprotoClientMetadata(req, pathPrefix) {
     token_endpoint_auth_method: 'none',
   };
 
-  return new Response(JSON.stringify(clientMeta), {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return clientMeta;
 }
 
 async function atprotoLogin(req, pathPrefix, kvStore) {
@@ -42,20 +50,22 @@ async function atprotoLogin(req, pathPrefix, kvStore) {
   const didData = await resolveDid(id);
   const meta = await lookupAuthServer(didData);
 
-  const clientId = `https://${url.hostname}${pathPrefix}/client-metadata.json`;
-  const redirectUri = `https://${url.hostname}${pathPrefix}/atproto-callback`;
+  const cl = getClientMeta(req.url, pathPrefix);
+  const redirectUri = cl.redirect_uris[0];
 
   const pkce = await generateChallengeData();
 
   const state = genRandomText(32);
-  const authUri = `${meta.authorization_endpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
+  const authUri = `${meta.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
 
   const authReq = {
+    id,
+    did: didData.id,
+    as: meta,
+    client: cl,
     issuer: meta.issuer,
-    clientId,
-    redirectUri,
-    tokenEndpoint: meta.token_endpoint,
     codeVerifier: pkce.verifier,
+    redirectUri,
   };
 
   await kvStore.set(`oauth_state/${state}`, authReq);
@@ -71,26 +81,11 @@ async function atprotoLogin(req, pathPrefix, kvStore) {
 async function atprotoCallback(req, pathPrefix, kvStore) {
 
   const url = new URL(req.url);
-  const params = new URLSearchParams(url.search);
+  const paramsState = new URLSearchParams(url.search);
 
-  const state = params.get('state');
+  const state = paramsState.get('state');
   if (!state) {
     return new Response("Missing state param", {
-      status: 400,
-    });
-  }
-
-  const error = params.get('error');
-  if (error) {
-    const errorDesc = params.get('error_description');
-    return new Response(errorDesc, {
-      status: 400,
-    });
-  }
-
-  const code = params.get('code');
-  if (!code) {
-    return new Response("Missing code param", {
       status: 400,
     });
   }
@@ -102,32 +97,65 @@ async function atprotoCallback(req, pathPrefix, kvStore) {
     throw new Error("No such auth request");
   }
 
-  const res = await fetch(authReq.tokenEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
-    },    
-    body: new URLSearchParams({
-      code,
-      client_id: authReq.clientId,
-      redirect_uri: authReq.redirectUri,
-      grant_type: 'authorization_code',
-      code_verifier: authReq.codeVerifier,
-    }),
+  const params = oauth.validateAuthResponse(authReq.as, authReq.client, url, state);
+  if (oauth.isOAuth2Error(params)) {
+    console.error('Error Response', params)
+    throw new Error()
+  }
+
+  const dpopKeyPair = await oauth.generateKeyPair("RS256", {
+    extractable: true,
   });
 
-  const data = await res.json();
-  console.log(data);
+  const authorizationCodeGrantRequest = (dpopNonce) => {
+    const dpop = {
+      privateKey: dpopKeyPair.privateKey,
+      publicKey: dpopKeyPair.publicKey,
+      nonce: dpopNonce,
+    };
+    return oauth.authorizationCodeGrantRequest(
+      authReq.as, authReq.client, params, authReq.redirectUri, authReq.codeVerifier, { DPoP: dpop });
+  };
 
-  if (res.status !== 200) {
-    return new Response("Failed to get token", {
+  let res = await authorizationCodeGrantRequest();
+
+  let body = await res.json();
+
+  if (!res.ok) {
+    if (body.error === 'use_dpop_nonce') {
+      const dpopNonce = res.headers.get('DPoP-Nonce');
+      res = await authorizationCodeGrantRequest(dpopNonce);
+    }
+  }
+
+  body = await res.json();
+
+  if (!res.ok) {
+    return new Response("Failed for some reason", {
       status: 500,
     });
   }
 
+  if (body.sub !== authReq.did) {
+    return new Response("Mismatched DIDs", {
+      status: 400,
+    });
+  }
+
+  const session = {
+    userIdType: 'atproto',
+    userId: authReq.id,
+  };
+
+  const sessionKey = genRandomText(32);
+  await kvStore.set(`sessions/${sessionKey}`, session);
+
   return new Response(null, {
-    status: 200,
+    status: 303,
+    headers: {
+      'Location': '/',
+      'Set-Cookie': `session_key=${sessionKey}; Path=/; Max-Age=84600; Secure; HttpOnly`,
+    },
   });
 }
 
@@ -137,10 +165,12 @@ async function lookupAuthServer(didData) {
   const data = await res.json();
   const authServer = data.authorization_servers[0];
 
-  const asUri = `${authServer}/.well-known/oauth-authorization-server`;
-  const asRes = await fetch(asUri);
-  const asMeta = await asRes.json();
-  return asMeta;
+  const issuer = new URL(authServer);
+  const as = await oauth
+    .discoveryRequest(issuer, { algorithm: 'oauth2' })
+    .then((response) => oauth.processDiscoveryResponse(issuer, response))
+
+  return as;
 }
 
 async function resolveDid(didDomain) {
