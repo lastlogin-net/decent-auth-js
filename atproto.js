@@ -125,10 +125,9 @@ async function atprotoCallback(req, pathPrefix, kvStore) {
     if (body.error === 'use_dpop_nonce') {
       const dpopNonce = res.headers.get('DPoP-Nonce');
       res = await authorizationCodeGrantRequest(dpopNonce);
+      body = await res.json();
     }
   }
-
-  body = await res.json();
 
   if (!res.ok) {
     return new Response("Failed for some reason", {
@@ -189,23 +188,51 @@ async function resolveDid(didDomain) {
 }
 
 async function lookupDid(domain) {
-  const didDomain = `_atproto.${domain}`;
 
-  const res = await lookupDnsRecords(didDomain, 'TXT');
+  const dnsPromise = lookupDidDns(domain);
+  const httpPromise = lookupDidHttp(domain);
+
+  let did = await Promise.any([ dnsPromise, httpPromise ]);
+
+  if (!did) {
+    const results = await Promise.all([ dnsPromise, httpPromise ]);
+    did = results[0] ? results[0] : results[1];
+  }
+
+  if (!did) {
+    throw new Error("DID not found");
+  }
+
+  return did;
+}
+
+async function lookupDidHttp(domain) {
+  const uri = `https://${domain}/.well-known/atproto-did`;
+  const res = await fetch(uri);
+  const did = await res.text();
+  return did;
+}
+
+async function lookupDidDns(domain) {
+
+  const verifDomain = `_atproto.${domain}`;
+
+  const res = await lookupDnsRecords(verifDomain, 'TXT');
 
   let did;
+
+  if (!res.Answer || res.Answer.length < 1) {
+    return null;
+  }
+
   for (const record of res.Answer) {
-    if (record.name === didDomain) {
+    if (record.name === verifDomain) {
       // TODO: not sure what format this is supposed to be
       const didTxt = JSON.parse(record.data);
       const didParts = didTxt.split('=');
       did = didParts[1];
       break;
     }
-  }
-
-  if (!did) {
-    throw new Error("DID not found");
   }
 
   return did;
