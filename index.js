@@ -49,6 +49,7 @@ class KvStore {
 const stylesTmpl = `
   body {
     font-family: Arial;
+    font-size: 1.2em;
     display: flex;
     justify-content: center;
   }

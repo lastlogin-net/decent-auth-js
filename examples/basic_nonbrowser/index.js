@@ -29,6 +29,45 @@ async function createKvStore(path) {
   return kvStore;
 }
 
+function html(session) {
+
+  let content;
+  if (session) {
+    content = `<h1>Hi there ${session.userId}</h1>\n<a href='${loginPrefix}/logout'>Logout</a>`;
+  }
+  else {
+    content = `<h1>Hi there</h1>\n<a href='${loginPrefix}'>Login</a>`;
+  }
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <style>
+          body {
+            font-family: Arial;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: center;
+          }
+
+          .content {
+            width: 640px;
+          }
+        </style>
+      </head>
+      <body>
+        <main class='content'>
+          ${content}
+        </main>
+      </body>
+    </html>
+  `;
+}
+
 const kvStore = await createKvStore('./store.json');
 //const kvStore = new lastlogin.KvStore();
 
@@ -52,14 +91,14 @@ const handler = async (req) => {
   const session = await lastlogin.getSession(req, kvStore);
 
   if (session) {
-    return new Response(`<h1>Hi there ${session.userId}</h1>\n<a href='${loginPrefix}/logout'>Logout</a>`,{
+    return new Response(html(session),{
       headers: {
         'Content-Type': 'text/html',
       },
     });
   }
   else {
-    return new Response(`<h1>Hi there</h1>\n<a href='${loginPrefix}'>Login</a>`,{
+    return new Response(html(session),{
       headers: {
         'Content-Type': 'text/html',
       },
