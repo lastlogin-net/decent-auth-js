@@ -1,6 +1,6 @@
 import lastlogin from '../../index.js';
 
-const loginPrefix = '/lastlogin';
+const loginPrefix = '/login';
 
 class JsonKvStore extends lastlogin.KvStore {
   constructor(path) {
