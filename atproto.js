@@ -42,10 +42,20 @@ function getClientMeta(unparsedUrl, pathPrefix) {
   return clientMeta;
 }
 
-async function atprotoLogin(req, pathPrefix, kvStore, did) {
+async function atprotoLogin(req, pathPrefix, kvStore, config) {
 
-  const didData = await resolveDid(did);
-  const as = await lookupAuthServer(didData);
+  let handle;
+  let as;
+  let did;
+  if (config.did) {
+    did = config.did;
+    const didData = await resolveDid(did);
+    handle = didData.alsoKnownAs[0].split('at://')[1];
+    as = await lookupAuthServer(didData);
+  }
+  else {
+    as = config.authServerMeta;
+  }
 
   const cl = getClientMeta(req.url, pathPrefix);
   const redirectUri = cl.redirect_uris[0];
@@ -59,22 +69,25 @@ async function atprotoLogin(req, pathPrefix, kvStore, did) {
     extractable: true,
   });
 
-  const handle = didData.alsoKnownAs[0].split('at://')[1];
+  const params = {
+    response_type: "code",
+    code_challenge: pkce.challenge,
+    code_challenge_method: "S256",
+    client_id: cl.client_id,
+    state,
+    redirect_uri: cl.redirect_uris[0],
+    scope: cl.scope,
+  }
+
+  if (handle) {
+    params.login_hint = handle;
+  }
 
   const makeParRequest = async (dpopNonce) => {
     return oauth.pushedAuthorizationRequest(
       as,
       cl,
-      {
-        response_type: "code",
-        code_challenge: pkce.challenge,
-        code_challenge_method: "S256",
-        client_id: cl.client_id,
-        state,
-        redirect_uri: cl.redirect_uris[0],
-        scope: cl.scope,
-        login_hint: handle,
-      },
+      params,
       {
         DPoP: {
           privateKey: dpopKeyPair.privateKey,
@@ -100,8 +113,8 @@ async function atprotoLogin(req, pathPrefix, kvStore, did) {
   }
 
   const authReq = {
-    id: handle,
-    did: didData.id,
+    handle,
+    did,
     as,
     client: cl,
     codeVerifier: pkce.verifier,
@@ -184,15 +197,23 @@ async function atprotoCallback(req, pathPrefix, kvStore) {
     });
   }
 
-  if (body.sub !== authReq.did) {
+  const did = body.sub;
+
+  if (authReq.did && authReq.did !== did) {
     return new Response("Mismatched DIDs", {
       status: 400,
     });
   }
 
+  let handle = authReq.handle;
+  if (!handle) {
+    const didData = await resolveDid(did);
+    handle = didData.alsoKnownAs[0].split('at://')[1];
+  }
+
   const session = {
     userIdType: 'atproto',
-    userId: authReq.id,
+    userId: handle,
   };
 
   const sessionKey = genRandomText(32);

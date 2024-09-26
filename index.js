@@ -281,8 +281,7 @@ async function login(req, pathPrefix, kvStore) {
     }
 
     if (proto.type === 'atproto') {
-      const id = value;
-      return atprotoLogin(req, pathPrefix, kvStore, proto.did);
+      return atprotoLogin(req, pathPrefix, kvStore, proto);
     }
     else if (proto.type === 'oidc') {
       const providerUri = domain;
@@ -297,7 +296,14 @@ async function login(req, pathPrefix, kvStore) {
 
 async function protoDiscovery(domain) {
   const didPromise = lookupDid(domain);
-  const metaPromise = fetch(`https://${domain}/.well-known/openid-configuration`).then(res => {
+  const oidcMetaPromise = fetch(`https://${domain}/.well-known/openid-configuration`).then(res => {
+    if (!res.ok) {
+      return null;
+    }
+
+    return res.json();
+  });
+  const oauth2MetaPromise = fetch(`https://${domain}/.well-known/oauth-authorization-server`).then(res => {
     if (!res.ok) {
       return null;
     }
@@ -305,7 +311,7 @@ async function protoDiscovery(domain) {
     return res.json();
   });
 
-  const results = await Promise.all([ didPromise, metaPromise ]);
+  const results = await Promise.all([ didPromise, oidcMetaPromise, oauth2MetaPromise ]);
 
   if (results[0]) {
     return {
@@ -317,6 +323,12 @@ async function protoDiscovery(domain) {
     return {
       type: 'oidc',
       meta: results[1],
+    };
+  }
+  else if (results[2]) {
+    return {
+      type: 'atproto',
+      authServerMeta: results[2],
     };
   }
   else {
