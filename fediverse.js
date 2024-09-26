@@ -2,12 +2,8 @@ import { genRandomText } from './utils.js';
 
 const FEDIVERSE_ID_TYPE_ACTIVITYPUB = 'activitypub';
 
-async function fediversePage(req, pathPrefix, kvStore) {
+async function fediversePage(req, pathPrefix, kvStore, id) {
 
-  const url = new URL(req.url);
-  const params = new URLSearchParams(url.search);
-
-  const id = params.get('id');
   const parsedId = parseFediverseId(id);
 
   switch (parsedId.type) {
@@ -84,7 +80,7 @@ async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
   let app = await kvStore.get(`apps/${serverDomain}/${url.hostname}`);
 
   if (!app) {
-    const redirectUri = `${url.origin}${pathPrefix}/callback`;
+    const redirectUri = `${url.origin}${pathPrefix}/fediverse-callback`;
 
     const clientName = "LastLogin Client";
     const redirectUris = [ redirectUri ];

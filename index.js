@@ -1,7 +1,6 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
-import { atprotoLogin, atprotoClientMetadata, atprotoCallback } from './atproto.js';
-import { oidcLogin, oidcCallback } from './oidc.js';
-
+import { atprotoLogin, atprotoClientMetadata, atprotoCallback, lookupDid } from './atproto.js';
+import { oidcLogin, oidcLoginWithMeta, oidcCallback } from './oidc.js';
 
 class KvStore {
   constructor() {
@@ -57,6 +56,29 @@ const stylesTmpl = `
   .content {
     width: 640px;
   }
+
+  .hidden {
+    display: none;
+  }
+
+  .details-label {
+    user-select: none;
+    cursor: pointer;
+    padding: 0px 3px;
+    border: 1px solid #000;
+    border-radius: 4px;
+  }
+
+  .details {
+    padding: 10px;
+    border: 1px solid #000;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+
+  input:not(:checked) + .details {
+    display: none;
+  }
 `;
 
 const headerTmpl = `
@@ -86,21 +108,39 @@ const loginPageTmpl = (pathPrefix) => {
 
     <h1>Login Page</h1>
 
-    <form action=${pathPrefix}/login-fediverse>
-      <label for='fediverse-id-input'>Fediverse ID</label>
-      <input type='text' id='fediverse-id-input' name='id' />
-      <button>Submit</button>
-    </form>
+    <p>
+      To login, enter an identifier or identity server
+      <label class='details-label' for='details-checkbox'>?</label>
+    </p>
 
-    <form action=${pathPrefix}/login-atproto>
-      <label for='atprodo-id-input'>ATProto ID</label>
-      <input type='text' id='atproto-id-input' name='id' />
-      <button>Submit</button>
-    </form>
+    <input id='details-checkbox' type='checkbox' class='hidden' />
+    <div class='details'>
+      <p>
+        In the examples below, "example.com" is a stand-in for your own domain.
+      </p>
+      <p>
+        Example identifiers:
+      </p>
+      <ul>
+        <li>Fediverse ID (@user@example.com)</li>
+        <li>ATProto ID (user.bsky.social, example.com)</li>
+        <li>IndieAuth URL (example.com, example.com/user)</li>
+        <li>Email address (user@example.com)</li>
+      </ul>
 
-    <form action=${pathPrefix}/login-oidc>
-      <input type='hidden' id='oidc-provider-uri-input' name='provider_uri' value='https://lastlogin.net'/>
-      <button>Login with LastLogin</button>
+      <p>
+        Example identity servers:
+      </p>
+      <ul>
+        <li>OpenID Connect server (LastLogin.net, example.com)</li>
+        <li>ATProto PDS (bsky.social, example.com)</li>
+        <li>IndieAuth server (IndieAuth.com, example.com)</li>
+      </ul>
+    </div>
+
+    <form action=${pathPrefix}/initiate>
+      <input type='text' id='login-input' name='value' placeholder='lastlogin.net' />
+      <button>Login</button>
     </form>
 
     ${footerTmpl}
@@ -143,33 +183,24 @@ function createHandler(kvStore, opt) {
 
         break;
       }
-      case '/login-oidc': {
-        return oidcLogin(req, pathPrefix, kvStore);
+      case '/initiate': {
+        return login(req, pathPrefix, kvStore);
         break;
       }
       case '/oidc-callback': {
         return oidcCallback(req, kvStore);
         break;
       }
-      case '/login-atproto': {
-        return atprotoLogin(req, pathPrefix, kvStore);
-        break;
-      }
       case '/atproto-callback': {
         return atprotoCallback(req, pathPrefix, kvStore);
         break;
       }
+      case '/fediverse-callback': {
+        return completeMastodonLogin(req, kvStore);
+        break;
+      }
       case '/client-metadata.json': {
         return atprotoClientMetadata(req, pathPrefix);
-        break;
-      }
-      case '/login-fediverse': {
-        const res = fediversePage(req, pathPrefix, kvStore);
-        return res;
-        break;
-      }
-      case '/callback': {
-        return completeMastodonLogin(req, kvStore);
         break;
       }
       default: {
@@ -186,8 +217,6 @@ function loginPage(pathPrefix) {
   return sendHtml(loginPageTmpl(pathPrefix));
 }
 
-
-
 function sendHtml(html) {
   return new Response(html, {
     headers: {
@@ -196,6 +225,100 @@ function sendHtml(html) {
   });
 }
 
+async function login(req, pathPrefix, kvStore) {
+  const url = new URL(req.url);
+  const params = new URLSearchParams(url.search);
+
+  const value = params.get('value');
+
+  if (!value) {
+    const providerUri = 'https://lastlogin.net';
+    return oidcLogin(req, pathPrefix, kvStore, providerUri);
+  }
+
+  const parts = value.split('@');
+
+  if (parts.length === 3) {
+    // fediverse
+    const id = value;
+    return fediversePage(req, pathPrefix, kvStore, id);
+  }
+  else if (parts.length === 2) {
+    // email. always use LastLogin for now
+    const providerUri = 'https://lastlogin.net';
+    return oidcLogin(req, pathPrefix, kvStore, providerUri);
+  }
+  else {
+    // URL
+    if (value.includes('lastlogin.net')) {
+      const providerUri = 'https://lastlogin.net';
+      return oidcLogin(req, pathPrefix, kvStore, providerUri);
+    }
+
+    const parsedUrl = value.startsWith('http') ? new URL(value) : new URL('https://' + value);
+    console.log(parsedUrl);
+
+    if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
+      // IndieAuth
+      return new Response("IndieAuth not yet supported", {
+        status: 400,
+      });
+    }
+
+    // Either atproto or OIDC
+    const domain = parsedUrl.hostname;
+    const proto = await protoDiscovery(domain);
+
+    if (!proto) {
+      return new Response("Could not log you in", {
+        status: 400,
+      });
+    }
+
+    if (proto.type === 'atproto') {
+      console.log(proto);
+      const id = value;
+      return atprotoLogin(req, pathPrefix, kvStore, id, proto.did);
+    }
+    else if (proto.type === 'oidc') {
+      const providerUri = domain;
+      return oidcLoginWithMeta(req, pathPrefix, kvStore, proto.meta);
+    }
+  }
+
+  return new Response("Invalid value param", {
+    status: 400,
+  });
+}
+
+async function protoDiscovery(domain) {
+  const didPromise = lookupDid(domain);
+  const metaPromise = fetch(`https://${domain}/.well-known/openid-configuration`).then(res => {
+    if (!res.ok) {
+      return null;
+    }
+
+    return res.json();
+  });
+
+  const results = await Promise.all([ didPromise, metaPromise ]);
+
+  if (results[0]) {
+    return {
+      type: 'atproto',
+      did: results[0],
+    };
+  }
+  else if (results[1]) {
+    return {
+      type: 'oidc',
+      meta: results[1],
+    };
+  }
+  else {
+    return null;
+  }
+}
 
 function getCookie(req, name) {
 

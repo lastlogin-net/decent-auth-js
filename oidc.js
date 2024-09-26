@@ -1,15 +1,19 @@
 import { genRandomText, parseAndVerifyJwt } from './utils.js';
 
-async function oidcLogin(req, pathPrefix, kvStore) {
+async function oidcLogin(req, pathPrefix, kvStore, providerUri) {
 
   const url = new URL(req.url);
-  const params = new URLSearchParams(url.search);
-
-  const providerUri = params.get('provider_uri');
 
   const metaRes = await fetch(`${providerUri}/.well-known/openid-configuration`);
 
   const meta = await metaRes.json();
+
+  return oidcLoginWithMeta(req, pathPrefix, kvStore, meta);
+}
+
+async function oidcLoginWithMeta(req, pathPrefix, kvStore, meta) {
+
+  const url = new URL(req.url);
 
   const clientId = url.origin;
   const redirectUri = `${url.origin}${pathPrefix}/oidc-callback`;
@@ -94,5 +98,6 @@ async function oidcCallback(req, kvStore) {
 
 export {
   oidcLogin,
+  oidcLoginWithMeta,
   oidcCallback,
 };

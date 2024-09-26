@@ -40,14 +40,9 @@ function getClientMeta(unparsedUrl, pathPrefix) {
   return clientMeta;
 }
 
-async function atprotoLogin(req, pathPrefix, kvStore) {
+async function atprotoLogin(req, pathPrefix, kvStore, id, did) {
 
-  const url = new URL(req.url);
-  const params = new URLSearchParams(url.search);
-
-  const id = params.get('id');
-
-  const didData = await resolveDid(id);
+  const didData = await resolveDid(did);
   const meta = await lookupAuthServer(didData);
 
   const cl = getClientMeta(req.url, pathPrefix);
@@ -172,9 +167,7 @@ async function lookupAuthServer(didData) {
   return as;
 }
 
-async function resolveDid(didDomain) {
-
-  const did = await lookupDid(didDomain);
+async function resolveDid(did) {
 
   if (!did.startsWith('did:plc')) {
     throw new Error("Unsupported did type: " + did);
@@ -199,16 +192,17 @@ async function lookupDid(domain) {
     did = results[0] ? results[0] : results[1];
   }
 
-  if (!did) {
-    throw new Error("DID not found");
-  }
-
   return did;
 }
 
 async function lookupDidHttp(domain) {
   const uri = `https://${domain}/.well-known/atproto-did`;
   const res = await fetch(uri);
+
+  if (!res.ok) {
+    return null;
+  }
+
   const did = await res.text();
   return did;
 }
@@ -254,4 +248,5 @@ export {
   atprotoLogin,
   atprotoClientMetadata,
   atprotoCallback,
+  lookupDid,
 };
