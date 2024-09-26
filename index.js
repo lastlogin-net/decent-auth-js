@@ -123,7 +123,7 @@ const loginPageTmpl = (pathPrefix) => {
       </p>
       <ul>
         <li>Fediverse ID (@user@example.com)</li>
-        <li>ATProto ID (user.bsky.social, example.com)</li>
+        <li>ATProto ID (user.bsky.social, example.com, did:plc:abc123...)</li>
         <li>IndieAuth URL (example.com, example.com/user)</li>
         <li>Email address (user@example.com)</li>
       </ul>
@@ -236,6 +236,12 @@ async function login(req, pathPrefix, kvStore) {
     return oidcLogin(req, pathPrefix, kvStore, providerUri);
   }
 
+  if (value.startsWith('did:plc')) {
+    // atproto shortcut
+    const did = value;
+    return atprotoLogin(req, pathPrefix, kvStore, did);
+  }
+
   const parts = value.split('@');
 
   if (parts.length === 3) {
@@ -256,7 +262,6 @@ async function login(req, pathPrefix, kvStore) {
     }
 
     const parsedUrl = value.startsWith('http') ? new URL(value) : new URL('https://' + value);
-    console.log(parsedUrl);
 
     if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
       // IndieAuth
@@ -276,9 +281,8 @@ async function login(req, pathPrefix, kvStore) {
     }
 
     if (proto.type === 'atproto') {
-      console.log(proto);
       const id = value;
-      return atprotoLogin(req, pathPrefix, kvStore, id, proto.did);
+      return atprotoLogin(req, pathPrefix, kvStore, proto.did);
     }
     else if (proto.type === 'oidc') {
       const providerUri = domain;

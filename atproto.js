@@ -40,7 +40,7 @@ function getClientMeta(unparsedUrl, pathPrefix) {
   return clientMeta;
 }
 
-async function atprotoLogin(req, pathPrefix, kvStore, id, did) {
+async function atprotoLogin(req, pathPrefix, kvStore, did) {
 
   const didData = await resolveDid(did);
   const meta = await lookupAuthServer(didData);
@@ -53,8 +53,9 @@ async function atprotoLogin(req, pathPrefix, kvStore, id, did) {
   const state = genRandomText(32);
   const authUri = `${meta.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
 
+  const handle = didData.alsoKnownAs[0].split('at://')[1];
   const authReq = {
-    id,
+    id: handle,
     did: didData.id,
     as: meta,
     client: cl,
