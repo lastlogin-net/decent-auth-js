@@ -81,8 +81,10 @@ const lastloginHandler = lastlogin.createHandler(kvStore, {
 const handler = async (req) => {
   const url = new URL(req.url);
 
+  const remoteAddr = req.headers.get('X-Forwarded-For');
+
   const ts = new Date().toISOString();
-  console.log(`${ts}\t${req.method}\t${url.host}\t${url.pathname}`);
+  console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
 
   if (url.pathname.startsWith(loginPrefix)) {
     return lastloginHandler(req);
