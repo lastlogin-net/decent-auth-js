@@ -2,6 +2,8 @@ import { genRandomText } from './utils.js';
 import { generateChallengeData } from './oauth2.js';
 import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
 
+// This code borrowed heavily from frontpage.fyi's implementation
+
 async function atprotoClientMetadata(req, pathPrefix) {
 
   const clientMeta = getClientMeta(req.url, pathPrefix);
@@ -43,7 +45,7 @@ function getClientMeta(unparsedUrl, pathPrefix) {
 async function atprotoLogin(req, pathPrefix, kvStore, did) {
 
   const didData = await resolveDid(did);
-  const meta = await lookupAuthServer(didData);
+  const as = await lookupAuthServer(didData);
 
   const cl = getClientMeta(req.url, pathPrefix);
   const redirectUri = cl.redirect_uris[0];
@@ -51,25 +53,78 @@ async function atprotoLogin(req, pathPrefix, kvStore, did) {
   const pkce = await generateChallengeData();
 
   const state = genRandomText(32);
-  const authUri = `${meta.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
+  const authUri = `${as.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
+
+  const dpopKeyPair = await oauth.generateKeyPair("RS256", {
+    extractable: true,
+  });
 
   const handle = didData.alsoKnownAs[0].split('at://')[1];
+
+  const makeParRequest = async (dpopNonce) => {
+    return oauth.pushedAuthorizationRequest(
+      as,
+      cl,
+      {
+        response_type: "code",
+        code_challenge: pkce.challenge,
+        code_challenge_method: "S256",
+        client_id: cl.client_id,
+        state,
+        redirect_uri: cl.redirect_uris[0],
+        scope: cl.scope,
+        login_hint: handle,
+      },
+      {
+        DPoP: {
+          privateKey: dpopKeyPair.privateKey,
+          publicKey: dpopKeyPair.publicKey,
+          nonce: dpopNonce,
+        },
+      },
+    );
+  };
+
+  let res = await makeParRequest();
+
+  let par = await res.json();
+
+  let dpopNonce;
+
+  if (!res.ok) {
+    if (par.error === 'use_dpop_nonce') {
+      dpopNonce = res.headers.get('DPoP-Nonce');
+      res = await makeParRequest(dpopNonce);
+      par = await res.json();
+    }
+  }
+
   const authReq = {
     id: handle,
     did: didData.id,
-    as: meta,
+    as,
     client: cl,
-    issuer: meta.issuer,
     codeVerifier: pkce.verifier,
     redirectUri,
+    dpopPrivateJwk: JSON.stringify(
+      await crypto.subtle.exportKey("jwk", dpopKeyPair.privateKey),
+    ),
+    dpopPublicJwk: JSON.stringify(
+      await crypto.subtle.exportKey("jwk", dpopKeyPair.publicKey),
+    ),
+    dpopNonce,
   };
 
   await kvStore.set(`oauth_state/${state}`, authReq);
 
+  const redirUri = new URL(as.authorization_endpoint);
+  redirUri.searchParams.set('request_uri', par.request_uri);
+  redirUri.searchParams.set('client_id', cl.client_id);
+
   return new Response(null, {
     status: 303,
     headers: {
-      'Location': authUri,
+      'Location': redirUri.toString(),
     },
   });
 }
@@ -99,21 +154,19 @@ async function atprotoCallback(req, pathPrefix, kvStore) {
     throw new Error()
   }
 
-  const dpopKeyPair = await oauth.generateKeyPair("RS256", {
-    extractable: true,
-  });
+  const { privateKey, publicKey } = await importJwks(authReq.dpopPrivateJwk, authReq.dpopPublicJwk); 
 
   const authorizationCodeGrantRequest = (dpopNonce) => {
     const dpop = {
-      privateKey: dpopKeyPair.privateKey,
-      publicKey: dpopKeyPair.publicKey,
+      privateKey,
+      publicKey,
       nonce: dpopNonce,
     };
     return oauth.authorizationCodeGrantRequest(
       authReq.as, authReq.client, params, authReq.redirectUri, authReq.codeVerifier, { DPoP: dpop });
   };
 
-  let res = await authorizationCodeGrantRequest();
+  let res = await authorizationCodeGrantRequest(authReq.dpopNonce);
 
   let body = await res.json();
 
@@ -243,6 +296,30 @@ async function lookupDnsRecords(domain, type) {
   });
   const recs = await recRes.json();
   return recs;
+}
+
+async function importJwks(privateJwk, publicJwk) {
+  const [privateKey, publicKey] = await Promise.all([
+    crypto.subtle.importKey(
+      "jwk",
+      JSON.parse(privateJwk),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      true,
+      ["sign"],
+    ),
+    crypto.subtle.importKey(
+      "jwk",
+      JSON.parse(publicJwk),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      true,
+      ["verify"],
+    ),
+  ]);
+
+  return {
+    publicKey,
+    privateKey,
+  };
 }
 
 export {
