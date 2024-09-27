@@ -131,26 +131,26 @@ const loginPageTmpl = (errorMessage, pathPrefix) => {
     <input id='details-checkbox' type='checkbox' class='hidden' />
     <div class='details'>
       <p>
-        In the examples below, "example.com" is a stand-in for your own domain.
+        In the examples below, "<code>example.com</code>" is a stand-in for your own domain.
       </p>
       <p>
         Example identifiers:
       </p>
       <ul>
-        <li>Fediverse ID (@user@example.com)</li>
-        <li>ATProto ID (user.bsky.social, example.com, did:plc:abc123...)</li>
+        <li>Fediverse ID (<code>@user@mastodon.social</code>, <code>@user@example.com</code>)</li>
+        <li>ATProto ID (<code>user.bsky.social</code>, <code>example.com</code>, <code>did:plc:abc123...</code>)</li>
         <!--
-        <li>IndieAuth URL (example.com, example.com/user)</li>
+        <li>IndieAuth URL (<code>example.com</code>, <code>example.com/user</code>)</li>
         -->
-        <li>Email address (user@example.com)</li>
+        <li>Email address (<code>user@example.com</code>)</li>
       </ul>
 
       <p>
         Example identity servers:
       </p>
       <ul>
-        <li>OpenID Connect server (LastLogin.net, example.com)</li>
-        <li>ATProto PDS (bsky.social, example.com)</li>
+        <li>OpenID Connect server (<code><a href='https://lastlogin.net'>LastLogin.net</a></code>, <code>example.com</code>)</li>
+        <li>ATProto PDS (<code><a href='https://bsky.social'>bsky.social</a></code>, <code>example.com</code>)</li>
         <!-- TODO: Find out if IndieAuth actually supports server-first flows
         <li>IndieAuth server (IndieAuth.com, example.com)</li>
         -->
@@ -236,7 +236,6 @@ function createHandler(kvStore, opt) {
 
 function loginPage(url, pathPrefix) {
   const errorMessage = url.searchParams.get('error');
-  console.log(errorMessage);
   return sendHtml(loginPageTmpl(errorMessage, pathPrefix));
 }
 
