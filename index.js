@@ -1,6 +1,7 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
 import { atprotoLogin, atprotoClientMetadata, atprotoCallback, lookupDid } from './atproto.js';
 import { oidcLogin, oidcLoginWithMeta, oidcCallback } from './oidc.js';
+import { indieAuthLogin, lookupIndieAuthServer } from './indieauth.js';
 
 class KvStore {
   constructor() {
@@ -135,7 +136,9 @@ const loginPageTmpl = (pathPrefix) => {
       <ul>
         <li>OpenID Connect server (LastLogin.net, example.com)</li>
         <li>ATProto PDS (bsky.social, example.com)</li>
+        <!-- I don't think IndieAuth supports entering servers...
         <li>IndieAuth server (IndieAuth.com, example.com)</li>
+        -->
       </ul>
     </div>
 
@@ -262,18 +265,17 @@ async function login(req, pathPrefix, kvStore) {
       return oidcLogin(req, pathPrefix, kvStore, providerUri);
     }
 
-    const parsedUrl = value.startsWith('http') ? new URL(value) : new URL('https://' + value);
+    const url = value.startsWith('http') ? value : 'https://' + value;
+    const parsedUrl = new URL(url);
 
     if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
-      // IndieAuth
-      return new Response("IndieAuth not yet supported", {
-        status: 400,
-      });
+      const idUri = url;
+      return indieAuthLogin(req, pathPrefix, kvStore, idUri);
     }
 
     // Either atproto or OIDC
     const domain = parsedUrl.hostname;
-    const proto = await protoDiscovery(domain);
+    const proto = await protoDiscovery(parsedUrl);
 
     if (!proto) {
       return new Response("Could not log you in", {
@@ -288,6 +290,10 @@ async function login(req, pathPrefix, kvStore) {
       const providerUri = domain;
       return oidcLoginWithMeta(req, pathPrefix, kvStore, proto.meta);
     }
+    else if (proto.type === 'indieauth') {
+      const idUri = url;
+      return indieAuthLogin(req, pathPrefix, kvStore, proto);
+    }
   }
 
   return new Response("Invalid value param", {
@@ -295,7 +301,10 @@ async function login(req, pathPrefix, kvStore) {
   });
 }
 
-async function protoDiscovery(domain) {
+async function protoDiscovery(parsedUrl) {
+
+  const domain = parsedUrl.hostname;
+
   const didPromise = lookupDid(domain);
   const oidcMetaPromise = fetch(`https://${domain}/.well-known/openid-configuration`).then(res => {
     if (!res.ok) {
@@ -312,12 +321,22 @@ async function protoDiscovery(domain) {
     return res.json();
   });
 
-  const results = await Promise.all([ didPromise, oidcMetaPromise, oauth2MetaPromise ]);
+  const indieAuthPromise = lookupIndieAuthServer(parsedUrl);
+
+  const results = await Promise.all([ didPromise, oidcMetaPromise, oauth2MetaPromise, indieAuthPromise ]);
 
   if (results[0]) {
     return {
       type: 'atproto',
       did: results[0],
+    };
+  }
+  else if (results[3]) {
+    // An IndieAuth server may also be an OIDC server, so we need to detect
+    // IndieAuth first
+    return {
+      type: 'indieauth',
+      meta: results[3],
     };
   }
   else if (results[1]) {
