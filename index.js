@@ -80,6 +80,10 @@ const stylesTmpl = `
   input:not(:checked) + .details {
     display: none;
   }
+
+  .error {
+    color: red;
+  }
 `;
 
 const headerTmpl = `
@@ -103,7 +107,17 @@ const footerTmpl = `
   </html>
 `;
 
-const loginPageTmpl = (pathPrefix) => {
+const loginPageTmpl = (errorMessage, pathPrefix) => {
+
+  let errHtml = '';
+  if (errorMessage) {
+    errHtml = `
+      <p class='error'>
+        ${escapeHtml(errorMessage)}
+      </p>
+    `;
+  };
+
   return `
     ${headerTmpl}
 
@@ -125,7 +139,9 @@ const loginPageTmpl = (pathPrefix) => {
       <ul>
         <li>Fediverse ID (@user@example.com)</li>
         <li>ATProto ID (user.bsky.social, example.com, did:plc:abc123...)</li>
+        <!--
         <li>IndieAuth URL (example.com, example.com/user)</li>
+        -->
         <li>Email address (user@example.com)</li>
       </ul>
 
@@ -135,9 +151,13 @@ const loginPageTmpl = (pathPrefix) => {
       <ul>
         <li>OpenID Connect server (LastLogin.net, example.com)</li>
         <li>ATProto PDS (bsky.social, example.com)</li>
+        <!-- TODO: Find out if IndieAuth actually supports server-first flows
         <li>IndieAuth server (IndieAuth.com, example.com)</li>
+        -->
       </ul>
     </div>
+
+    ${errHtml}
 
     <form action=${pathPrefix}/initiate>
       <input type='text' id='login-input' name='value' placeholder='lastlogin.net' />
@@ -166,7 +186,7 @@ function createHandler(kvStore, opt) {
 
     switch (path) {
       case '/': {
-        return loginPage(pathPrefix);
+        return loginPage(url, pathPrefix);
         break;
       }
       case '/logout': {
@@ -214,8 +234,10 @@ function createHandler(kvStore, opt) {
   return handler;
 }
 
-function loginPage(pathPrefix) {
-  return sendHtml(loginPageTmpl(pathPrefix));
+function loginPage(url, pathPrefix) {
+  const errorMessage = url.searchParams.get('error');
+  console.log(errorMessage);
+  return sendHtml(loginPageTmpl(errorMessage, pathPrefix));
 }
 
 function sendHtml(html) {
@@ -262,13 +284,13 @@ async function login(req, pathPrefix, kvStore) {
       return oidcLogin(req, pathPrefix, kvStore, providerUri);
     }
 
-    const parsedUrl = value.startsWith('http') ? new URL(value) : new URL('https://' + value);
+    const parsedUrl = normalizeUrl(value);
+    if (!parsedUrl) {
+      return resetWithError(pathPrefix, `Could not convert '${value}' into an identifier or server address`);
+    }
 
     if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
-      // IndieAuth
-      return new Response("IndieAuth not yet supported", {
-        status: 400,
-      });
+      return resetWithError(pathPrefix, `Failed to log in with '${value}'. URL paths ('${parsedUrl.pathname}') are not currently supported`);
     }
 
     // Either atproto or OIDC
@@ -276,9 +298,7 @@ async function login(req, pathPrefix, kvStore) {
     const proto = await protoDiscovery(domain);
 
     if (!proto) {
-      return new Response("Could not log you in", {
-        status: 400,
-      });
+      return resetWithError(pathPrefix, `Failed to find a compatible login method for '${domain}'`);
     }
 
     if (proto.type === 'atproto') {
@@ -290,27 +310,53 @@ async function login(req, pathPrefix, kvStore) {
     }
   }
 
-  return new Response("Invalid value param", {
-    status: 400,
+  return resetWithError(pathPrefix, `Invalid input`);
+}
+
+function resetWithError(pathPrefix, errorMessage) {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      'Location': `${pathPrefix}?error=${errorMessage}`,
+    },
   });
+}
+
+function normalizeUrl(value) {
+
+  if (!value.includes('.')) {
+    return null;
+  }
+
+  const parsedUrl = value.startsWith('http') ? new URL(value) : new URL('https://' + value);
+
+  return parsedUrl;
 }
 
 async function protoDiscovery(domain) {
   const didPromise = lookupDid(domain);
-  const oidcMetaPromise = fetch(`https://${domain}/.well-known/openid-configuration`).then(res => {
-    if (!res.ok) {
+  const oidcMetaPromise = fetch(`https://${domain}/.well-known/openid-configuration`)
+    .then(res => {
+      if (!res.ok) {
+        return null;
+      }
+      return res.json();
+    })
+    .catch(e => {
       return null;
-    }
+    });
+  const oauth2MetaPromise = fetch(`https://${domain}/.well-known/oauth-authorization-server`)
+    .then(res => {
+      if (!res.ok) {
+        return null;
+      }
 
-    return res.json();
-  });
-  const oauth2MetaPromise = fetch(`https://${domain}/.well-known/oauth-authorization-server`).then(res => {
-    if (!res.ok) {
+      return res.json();
+    })
+    .catch(e => {
       return null;
-    }
-
-    return res.json();
-  });
+    });
+    
 
   const results = await Promise.all([ didPromise, oidcMetaPromise, oauth2MetaPromise ]);
 
@@ -355,6 +401,11 @@ function getCookie(req, name) {
       return cookieParts.slice(1).join('=');
     }
   }
+}
+
+// From https://stackoverflow.com/a/6234804/943814
+const escapeHtml = (unsafe) => {
+    return unsafe.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 }
 
 

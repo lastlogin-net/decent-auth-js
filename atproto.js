@@ -272,7 +272,14 @@ async function lookupDid(domain) {
 
 async function lookupDidHttp(domain) {
   const uri = `https://${domain}/.well-known/atproto-did`;
-  const res = await fetch(uri);
+
+  let res;
+  try {
+    res = await fetch(uri);
+  }
+  catch (e) {
+    return null;
+  }
 
   if (!res.ok) {
     return null;
