@@ -1,8 +1,8 @@
-import * as lastlogin from '../../index.js';
+import * as auth from '../../index.js';
 
 const loginPrefix = '/login';
 
-class JsonKvStore extends lastlogin.KvStore {
+class JsonKvStore extends auth.KvStore {
   constructor(path) {
     super();
     this._path = path;
@@ -69,12 +69,12 @@ function html(session) {
 }
 
 const kvStore = await createKvStore('./store.json');
-//const kvStore = new lastlogin.KvStore();
+//const kvStore = new auth.KvStore();
 
 //kvStore.delete('sessions/');
 //kvStore.delete('oauth_state/');
 
-const lastloginHandler = lastlogin.createHandler(kvStore, {
+const handler = auth.createHandler(kvStore, {
   prefix: loginPrefix, 
 });
 
@@ -87,10 +87,10 @@ const handler = async (req) => {
   console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
 
   if (url.pathname.startsWith(loginPrefix)) {
-    return lastloginHandler(req);
+    return handler(req);
   }
 
-  const session = await lastlogin.getSession(req, kvStore);
+  const session = await auth.getSession(req, kvStore);
 
   if (session) {
     return new Response(html(session),{

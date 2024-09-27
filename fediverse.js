@@ -82,7 +82,7 @@ async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
   if (!app) {
     const redirectUri = `${url.origin}${pathPrefix}/fediverse-callback`;
 
-    const clientName = "LastLogin Client";
+    const clientName = "Decent Auth Client";
     const redirectUris = [ redirectUri ];
 
     const formData = new FormData();
