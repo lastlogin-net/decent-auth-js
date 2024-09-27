@@ -409,7 +409,7 @@ const escapeHtml = (unsafe) => {
 
 
 
-export default {
+export {
   createHandler,
   getSession,
   KvStore,

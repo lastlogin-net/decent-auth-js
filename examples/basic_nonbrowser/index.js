@@ -1,4 +1,4 @@
-import lastlogin from '../../index.js';
+import * as lastlogin from '../../index.js';
 
 const loginPrefix = '/login';
 
