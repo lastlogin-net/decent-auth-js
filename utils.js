@@ -18,11 +18,16 @@ function parseAndVerifyJwt(jwtText, expectedIssuer, expectedAudience) {
   }
 
   let audMatch = false;
-  for (const aud of jwt.claims.aud) {
-    if (aud === expectedAudience) {
-      audMatch = true;
-      break;
+  if (Array.isArray(jwt.claims.aud)) {
+    for (const aud of jwt.claims.aud) {
+      if (aud === expectedAudience) {
+        audMatch = true;
+        break;
+      }
     }
+  }
+  else {
+    audMatch = jwt.claims.aud === expectedAudience;
   }
 
   if (!audMatch) {

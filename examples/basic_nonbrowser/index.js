@@ -74,7 +74,7 @@ const kvStore = await createKvStore('./store.json');
 //kvStore.delete('sessions/');
 //kvStore.delete('oauth_state/');
 
-const handler = auth.createHandler(kvStore, {
+const authHandler = auth.createHandler(kvStore, {
   prefix: loginPrefix, 
 });
 
@@ -87,7 +87,7 @@ const handler = async (req) => {
   console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
 
   if (url.pathname.startsWith(loginPrefix)) {
-    return handler(req);
+    return authHandler(req);
   }
 
   const session = await auth.getSession(req, kvStore);
