@@ -1,4 +1,4 @@
-import { genRandomText } from './utils.js';
+import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
 
 const FEDIVERSE_ID_TYPE_ACTIVITYPUB = 'activitypub';
 
@@ -100,7 +100,7 @@ async function startMastodonLogin(req, serverDomain, pathPrefix, kvStore) {
     await kvStore.set(`apps/${serverDomain}/${url.hostname}`, app);
   }
 
-  const state = genRandomText(32);
+  const state = oauth.generateRandomState();
   const authUri = `https://${serverDomain}/oauth/authorize?client_id=${app.client_id}&redirect_uri=${app.redirect_uri}&state=${state}&response_type=code&scope=read:accounts`;
 
   const authReq = {
@@ -177,7 +177,7 @@ async function completeMastodonLogin(req, kvStore) {
     data: credResData,
   };
 
-  const sessionKey = genRandomText(32);
+  const sessionKey = oauth.generateRandomState();
   await kvStore.set(`sessions/${sessionKey}`, session);
 
   return new Response(null, {

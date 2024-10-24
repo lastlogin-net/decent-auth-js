@@ -1,5 +1,4 @@
-import { genRandomText, parseAndVerifyJwt } from './utils.js';
-import { generateChallengeData } from './oauth2.js';
+import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
 
 async function oidcLogin(req, pathPrefix, kvStore, providerUri) {
 
@@ -47,17 +46,18 @@ async function oidcLoginWithMeta(req, pathPrefix, kvStore, meta) {
   const clientId = `https://${url.hostname}${pathPrefix}/oidc-client`;
   const redirectUri = `https://${url.hostname}${pathPrefix}/oidc-callback`;
 
-  const pkce = await generateChallengeData();
+  const codeVerifier = oauth.generateRandomCodeVerifier();
+  const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier);
 
-  const state = genRandomText(32);
-  const authUri = `${meta.authorization_endpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&response_type=code&scope=openid email profile&code_challenge=${pkce.challenge}&code_challenge_method=S256`;
+  const state = oauth.generateRandomState();
+  const authUri = `${meta.authorization_endpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&response_type=code&scope=openid email profile&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
   const authReq = {
     issuer: meta.issuer,
     clientId,
     redirectUri,
     tokenEndpoint: meta.token_endpoint,
-    codeVerifier: pkce.verifier,
+    codeVerifier,
   };
 
   await kvStore.set(`oauth_state/${state}`, authReq);
@@ -90,6 +90,8 @@ async function oidcCallback(req, kvStore) {
   if (!authReq) {
     throw new Error("No such auth request");
   }
+
+  console.log(authReq);
 
   const res = await fetch(authReq.tokenEndpoint, {
     method: 'POST',
@@ -126,7 +128,7 @@ async function oidcCallback(req, kvStore) {
     data: jwt,
   };
 
-  const sessionKey = genRandomText(32);
+  const sessionKey = oauth.generateRandomState();
   await kvStore.set(`sessions/${sessionKey}`, session);
 
   return new Response(null, {
@@ -136,6 +138,52 @@ async function oidcCallback(req, kvStore) {
       'Set-Cookie': `session_key=${sessionKey}; Path=/; Max-Age=84600; Secure; HttpOnly`,
     },
   });
+}
+
+function parseAndVerifyJwt(jwtText, expectedIssuer, expectedAudience) {
+  const jwt = parseJwt(jwtText);
+
+  if (expectedIssuer !== jwt.claims.iss) {
+    throw new Error("Issuer mismatch");
+  }
+
+  let audMatch = false;
+  if (Array.isArray(jwt.claims.aud)) {
+    for (const aud of jwt.claims.aud) {
+      if (aud === expectedAudience) {
+        audMatch = true;
+        break;
+      }
+    }
+  }
+  else {
+    audMatch = jwt.claims.aud === expectedAudience;
+  }
+
+  if (!audMatch) {
+    throw new Error("Audience mismatch");
+  }
+
+  return jwt;
+}
+
+// Parses JWT without verifying signature. Must be used over HTTPS
+function parseJwt(jwtText, iss, aud) {
+  const jwtParts = jwtText.split('.');
+  
+  if (jwtParts.length !== 3) {
+    throw new Error("Invalid JWT");
+  }
+
+  const header = JSON.parse(atob(jwtParts[0]));
+  const claims = JSON.parse(atob(jwtParts[1]));
+  const signature = jwtParts[2];
+
+  return {
+    header,
+    claims,
+    signature,
+  };
 }
 
 

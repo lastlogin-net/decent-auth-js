@@ -1,5 +1,3 @@
-import { genRandomText } from './utils.js';
-import { generateChallengeData } from './oauth2.js';
 import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
 
 // This code borrowed heavily from frontpage.fyi's implementation
@@ -60,10 +58,11 @@ async function atprotoLogin(req, pathPrefix, kvStore, config) {
   const cl = getClientMeta(req.url, pathPrefix);
   const redirectUri = cl.redirect_uris[0];
 
-  const pkce = await generateChallengeData();
+  const codeVerifier = oauth.generateRandomCodeVerifier();
+  const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier);
 
-  const state = genRandomText(32);
-  const authUri = `${as.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
+  const state = oauth.generateRandomState();
+  const authUri = `${as.authorization_endpoint}?client_id=${cl.client_id}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256&response_type=code&scope=atproto`;
 
   const dpopKeyPair = await oauth.generateKeyPair("RS256", {
     extractable: true,
@@ -71,7 +70,7 @@ async function atprotoLogin(req, pathPrefix, kvStore, config) {
 
   const params = {
     response_type: "code",
-    code_challenge: pkce.challenge,
+    code_challenge: codeChallenge,
     code_challenge_method: "S256",
     client_id: cl.client_id,
     state,
@@ -117,7 +116,7 @@ async function atprotoLogin(req, pathPrefix, kvStore, config) {
     did,
     as,
     client: cl,
-    codeVerifier: pkce.verifier,
+    codeVerifier,
     redirectUri,
     dpopPrivateJwk: JSON.stringify(
       await crypto.subtle.exportKey("jwk", dpopKeyPair.privateKey),
@@ -216,7 +215,7 @@ async function atprotoCallback(req, pathPrefix, kvStore) {
     userId: handle,
   };
 
-  const sessionKey = genRandomText(32);
+  const sessionKey = oauth.generateRandomState();
   await kvStore.set(`sessions/${sessionKey}`, session);
 
   return new Response(null, {
