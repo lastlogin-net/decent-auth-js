@@ -91,8 +91,6 @@ async function oidcCallback(req, kvStore) {
     throw new Error("No such auth request");
   }
 
-  console.log(authReq);
-
   const res = await fetch(authReq.tokenEndpoint, {
     method: 'POST',
     headers: {
