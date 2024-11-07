@@ -84,6 +84,13 @@ const stylesTmpl = `
   .error {
     color: red;
   }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #111;
+      color: #ddd;
+    }
+  }
 `;
 
 const headerTmpl = `
