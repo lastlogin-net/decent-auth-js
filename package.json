@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@extism/extism": "^2.0.0-rc10"
+  }
+}
