@@ -1,19 +1,21 @@
-//import http from 'http';
-//import Worker from 'web-worker';
+import createPlugin from '@extism/extism';
+import http from 'http';
 
-const worker = new Worker(
-  new URL('./worker.js', import.meta.url).href,
+const plugin = await createPlugin(
+  //"http://localhost:8000/target/wasm32-unknown-unknown/debug/decent_auth_rs.wasm",
+  //"http://localhost:8000/target/wasm32-wasip1/debug/decent_auth_rs.wasm",
+  //"../decent-auth-rs/target/wasm32-unknown-unknown/debug/decent_auth_rs.wasm",
+  "../decent-auth-rs/target/wasm32-wasip1/debug/decent_auth_rs.wasm",
   {
-    type: 'module',
+    runInWorker: true,
+    allowedHosts: ['*'],
+    logLevel: 'debug',
+    logger: console,
+    useWasi: true,
   },
 );
 
-const callbacks = {};
-
 async function handler(req) {
-  console.log(req.url);
-
-  const reqId = crypto.randomUUID();
 
   const headers = {};
 
@@ -31,31 +33,41 @@ async function handler(req) {
     headers,
   };
 
-  const promise = new Promise((resolve, reject) => {
-    callbacks[reqId] = resolve;
-  });
+  const out = await plugin.call("handle", JSON.stringify(encReq));
+  const pluginRes = out.json();
 
-  worker.postMessage({
-    type: 'request',
-    id: reqId,
-    req: JSON.stringify(encReq),
-  });
-
-  const res = await promise;
-
-  return new Response(res.body, {
-    status: res.code,
+  return new Response(pluginRes.body, {
+    status: pluginRes.code,
+    headers: pluginRes.headers,
   });
 }
 
-worker.addEventListener('message', (e) => {
-  const msg = e.data;
+async function nodeHandler(nodeReq, nodeRes) {
 
-  if (msg.type === 'response') {
-    callbacks[msg.id](msg.res);
+  const headers = {};
+  for (const key in nodeReq.headers) {
+    if (!headers[key]) {
+      headers[key] = [];
+    }
+    headers[key].push(nodeReq.headers[key]);
   }
-});
 
-Deno.serve({ port: 3000 }, handler);
+  const req = new Request(`http://${process.env.HOST ?? 'localhost'}${nodeReq.url}`, {
+    method: nodeReq.method,
+    headers: nodeReq.headers,
+  });
 
-//http.createServer(handler).listen(3000);
+  const res = await handler(req);
+
+  console.log(res);
+  nodeRes.setHeaders(res.headers);
+  nodeRes.writeHead(res.status);
+
+  for await (const chunk of res.body) {
+    nodeRes.write(chunk);
+  }
+
+  nodeRes.end();
+}
+
+http.createServer(nodeHandler).listen(3000);

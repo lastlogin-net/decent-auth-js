@@ -1,6 +1,4 @@
 import createPlugin from "jsr:@extism/extism@2.0.0-rc10";
-//import createPlugin from "https://cdn.jsdelivr.net/npm/@extism/extism@2.0.0-rc10/+esm";
-//import createPlugin from '@extism/extism';
 
 console.log("Hi there worker");
 
@@ -31,4 +29,3 @@ self.onmessage = async (e) => {
   }
 };
 
-//plugin.close();
