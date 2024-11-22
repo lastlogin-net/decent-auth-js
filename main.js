@@ -12,6 +12,7 @@ const plugin = await createPlugin(
     logLevel: 'debug',
     logger: console,
     useWasi: true,
+    allowHttpResponseHeaders: true,
   },
 );
 
