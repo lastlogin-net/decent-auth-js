@@ -32,8 +32,8 @@ class Server {
     const internalHandler = (req) => {
       const url = new URL(req.url);
       if (url.pathname.startsWith(this.#prefix)) {
-        return authHandler(req);
-        //return wasmHandler(req);
+        //return authHandler(req);
+        return wasmHandler(req);
       }
       else {
         return handler(req);
