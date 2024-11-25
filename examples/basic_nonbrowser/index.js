@@ -1,15 +1,28 @@
-import * as auth from '../../index.js';
+import fs from 'fs/promises';
+import * as decentauth from '../../index.js';
 
-const loginPrefix = '/login';
+const authPrefix = '/auth';
 
-class JsonKvStore extends auth.KvStore {
+class JsonKvStore extends decentauth.KvStore {
   constructor(path) {
     super();
     this._path = path;
 
     this._readyPromise = new Promise(async (resolve, reject) => {
-      const text = await Deno.readTextFile(path);
+      let text;
+      try {
+        text = await fs.readFile(path, { encoding: 'utf-8' });
+      }
+      catch (e) {
+        console.log(e);
+      }
+
+      if (!text) {
+        text = '{}';
+      }
+
       this._obj = JSON.parse(text);
+      this.persist();
       resolve();
     });
   }
@@ -19,7 +32,7 @@ class JsonKvStore extends auth.KvStore {
   }
 
   async persist() {
-    Deno.writeTextFile(this._path, JSON.stringify(this._obj, null, 2));
+    return fs.writeFile(this._path, JSON.stringify(this._obj, null, 2));
   }
 }
 
@@ -33,10 +46,10 @@ function html(session) {
 
   let content;
   if (session) {
-    content = `<h1>Hi there ${session.userId}</h1>\n<a href='${loginPrefix}/logout'>Logout</a>`;
+    content = `<h1>Hi there ${session.id}</h1>\n<a href='${authPrefix}/logout'>Logout</a>`;
   }
   else {
-    content = `<h1>Hi there</h1>\n<a href='${loginPrefix}'>Login</a>`;
+    content = `<h1>Hi there</h1>\n<a href='${authPrefix}'>Login</a>`;
   }
 
   return `
@@ -69,13 +82,10 @@ function html(session) {
 }
 
 const kvStore = await createKvStore('./store.json');
-//const kvStore = new auth.KvStore();
 
-//kvStore.delete('sessions/');
-//kvStore.delete('oauth_state/');
-
-const authHandler = auth.createHandler(kvStore, {
-  prefix: loginPrefix, 
+const server = new decentauth.Server({
+  kvStore,
+  prefix: authPrefix,
 });
 
 const handler = async (req) => {
@@ -86,11 +96,8 @@ const handler = async (req) => {
   const ts = new Date().toISOString();
   console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
 
-  if (url.pathname.startsWith(loginPrefix)) {
-    return authHandler(req);
-  }
-
-  const session = await auth.getSession(req, kvStore);
+  const session = await server.getSession(req);
+  console.log(session);
 
   if (session) {
     return new Response(html(session),{
@@ -108,7 +115,9 @@ const handler = async (req) => {
   }
 };
 
-Deno.serve({ port: 3000}, handler);
+server.serve(handler);
+
+//Deno.serve({ port: 3000}, handler);
 //Bun.serve({
 //  port: 3000,
 //  fetch: handler,

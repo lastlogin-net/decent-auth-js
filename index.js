@@ -1,6 +1,48 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
 import { atprotoLogin, atprotoClientMetadata, atprotoCallback, lookupDid } from './atproto.js';
 import { oidcLogin, oidcLoginWithMeta, oidcCallback, oidcClientMetadata } from './oidc.js';
+import { createNodeHandler, createHandler as createWasmHandler } from './main.js';
+
+class Server {
+
+  #kvStore = null;
+  #prefix = null;
+  #storagePrefix = 'decent_auth';
+
+  constructor(opt) {
+    this.#kvStore = opt?.kvStore;
+    this.#prefix = opt?.prefix;
+  }
+
+  async getSession(req) {
+    const sessionKey = getCookie(req, `${this.#storagePrefix}_session_key`);
+    const key = `/${this.#storagePrefix}/sessions/${sessionKey}`;
+    return await this.#kvStore.get(key)
+  }
+
+  async serve(handler) {
+    const http = await import('http');
+
+    const authHandler = createHandler(this.#kvStore, {
+      prefix: this.#prefix,
+    });
+
+    const wasmHandler = await createWasmHandler(this.#kvStore);
+
+    const internalHandler = (req) => {
+      const url = new URL(req.url);
+      if (url.pathname.startsWith(this.#prefix)) {
+        return authHandler(req);
+        //return wasmHandler(req);
+      }
+      else {
+        return handler(req);
+      }
+    };
+
+    http.createServer(createNodeHandler(internalHandler)).listen(3000);
+  }
+}
 
 class KvStore {
   constructor() {
@@ -16,25 +58,8 @@ class KvStore {
     this.persist();
   }
 
-  list(keyPrefix) {
-    const results = [];
-
-    for (const key in this._obj) {
-      if (key.startsWith(keyPrefix)) {
-        results.push(this._obj[key]);
-      }
-    }
-
-    return results;
-  }
-
-  delete(keyPrefix) {
-    for (const key in this._obj) {
-      if (key.startsWith(keyPrefix)) {
-        delete this._obj[key];
-      }
-    }
-
+  delete(key) {
+    delete this._obj[key];
     this.persist();
   }
 
@@ -421,6 +446,7 @@ const escapeHtml = (unsafe) => {
 
 
 export {
+  Server,
   createHandler,
   getSession,
   KvStore,

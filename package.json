@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "@extism/extism": "^2.0.0-rc10"
+    "@extism/extism": "^2.0.0-rc10",
+    "oauth4webapi": "^2"
   }
 }

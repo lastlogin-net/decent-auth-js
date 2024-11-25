@@ -1,4 +1,4 @@
-import * as oauth from 'https://cdn.jsdelivr.net/npm/oauth4webapi@2.17.0/+esm'
+import * as oauth from 'oauth4webapi'
 
 // This code borrowed heavily from frontpage.fyi's implementation
 
