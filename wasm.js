@@ -18,7 +18,7 @@ function decode(valueBytes) {
 
 async function createHandler(kvStore) {
 
-  const wasmBytes = await readFile("../decent-auth-rs/target/wasm32-wasip1/release/decent_auth_rs.wasm");
+  const wasmBytes = await readFile("./decent_auth.wasm");
   const module = await WebAssembly.compile(wasmBytes); 
 
   async function handler(req) {
