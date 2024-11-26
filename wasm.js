@@ -1,5 +1,6 @@
 import createPlugin from '@extism/extism';
-import http from 'http';
+import http from 'node:http';
+import { readFile } from 'node:fs/promises';
 
 const ERROR_CODE_NO_ERROR = 0;
 
@@ -17,45 +18,44 @@ function decode(valueBytes) {
 
 async function createHandler(kvStore) {
 
-  const plugin = await createPlugin(
-    //"http://localhost:8000/target/wasm32-unknown-unknown/debug/decent_auth_rs.wasm",
-    //"http://localhost:8000/target/wasm32-wasip1/debug/decent_auth_rs.wasm",
-    //"../decent-auth-rs/target/wasm32-unknown-unknown/debug/decent_auth_rs.wasm",
-    //"../decent-auth-rs/target/wasm32-wasip1/debug/decent_auth_rs.wasm",
-    "../decent-auth-rs/target/wasm32-wasip1/release/decent_auth_rs.wasm",
-    {
-      runInWorker: true,
-      allowedHosts: ['*'],
-      logLevel: 'debug',
-      logger: console,
-      useWasi: true,
-      allowHttpResponseHeaders: true,
-      config: {
-        path_prefix: '/auth',
-      },
-      functions: {
-        "extism:host/user": {
-          async kv_read(currentPlugin, offset) {
-            const key = currentPlugin.read(offset).text();
-            const value = await kvStore.get(key);
-            const valueBytes = encode(value);
-            const resultsArray = new Uint8Array(valueBytes.length + 1);
-            resultsArray[0] = ERROR_CODE_NO_ERROR;
-            resultsArray.set(valueBytes, 1);
-            return currentPlugin.store(resultsArray);
-          },
-          async kv_write(currentPlugin, keyOffset, valueOffset) {
-            const key = currentPlugin.read(keyOffset).text();
-            const valueBytes = currentPlugin.read(valueOffset);
-            const value = decode(valueBytes);
-            await kvStore.set(key, value);
-          },
-        }
-      },
-    },
-  );
+  const wasmBytes = await readFile("../decent-auth-rs/target/wasm32-wasip1/release/decent_auth_rs.wasm");
+  const module = await WebAssembly.compile(wasmBytes); 
 
   async function handler(req) {
+
+    const plugin = await createPlugin(
+      module,
+      {
+        runInWorker: true,
+        allowedHosts: ['*'],
+        logLevel: 'debug',
+        logger: console,
+        useWasi: true,
+        allowHttpResponseHeaders: true,
+        config: {
+          path_prefix: '/auth',
+        },
+        functions: {
+          "extism:host/user": {
+            async kv_read(currentPlugin, offset) {
+              const key = currentPlugin.read(offset).text();
+              const value = await kvStore.get(key);
+              const valueBytes = encode(value);
+              const resultsArray = new Uint8Array(valueBytes.length + 1);
+              resultsArray[0] = ERROR_CODE_NO_ERROR;
+              resultsArray.set(valueBytes, 1);
+              return currentPlugin.store(resultsArray);
+            },
+            async kv_write(currentPlugin, keyOffset, valueOffset) {
+              const key = currentPlugin.read(keyOffset).text();
+              const valueBytes = currentPlugin.read(valueOffset);
+              const value = decode(valueBytes);
+              await kvStore.set(key, value);
+            },
+          }
+        },
+      },
+    );
 
     const headers = {};
 
