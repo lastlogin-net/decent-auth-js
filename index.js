@@ -1,7 +1,7 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
 import { atprotoLogin, atprotoClientMetadata, atprotoCallback, lookupDid } from './atproto.js';
 import { oidcLogin, oidcLoginWithMeta, oidcCallback, oidcClientMetadata } from './oidc.js';
-import { createNodeHandler, createHandler as createWasmHandler } from './main.js';
+import { createNodeHandler, createHandler as createWasmHandler } from './wasm.js';
 
 class Server {
 
