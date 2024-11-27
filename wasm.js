@@ -1,6 +1,10 @@
 import createPlugin from '@extism/extism';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { argv } from 'node:process';
+
+const adminId = argv[2];
+console.log(adminId);
 
 const ERROR_CODE_NO_ERROR = 0;
 
@@ -23,6 +27,14 @@ async function createHandler(kvStore) {
 
   async function handler(req) {
 
+    const config = {
+        path_prefix: '/auth',
+    };
+
+    if (adminId) {
+      config.admin_id = adminId;
+    }
+
     const plugin = await createPlugin(
       module,
       {
@@ -32,9 +44,7 @@ async function createHandler(kvStore) {
         logger: console,
         useWasi: true,
         allowHttpResponseHeaders: true,
-        config: {
-          path_prefix: '/auth',
-        },
+        config,
         functions: {
           "extism:host/user": {
             async kv_read(currentPlugin, offset) {
@@ -86,13 +96,21 @@ async function createHandler(kvStore) {
 
     const encReq = JSON.stringify(pluginReq);
 
-    const out = await plugin.call("extism_handle", encReq);
-    const pluginRes = out.json();
+    try {
+      const out = await plugin.call("extism_handle", encReq);
+      const pluginRes = out.json();
 
-    return new Response(pluginRes.body, {
-      status: pluginRes.code,
-      headers: pluginRes.headers,
-    });
+      return new Response(pluginRes.body, {
+        status: pluginRes.code,
+        headers: pluginRes.headers,
+      });
+    }
+    catch(e) {
+      console.error(e);
+      return new Response("Error", {
+        status: 500,
+      });
+    }
   }
 
   return handler;
