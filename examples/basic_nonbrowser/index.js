@@ -88,7 +88,7 @@ const server = new decentauth.Server({
   prefix: authPrefix,
 });
 
-const handler = async (req) => {
+const handler = async (req, ctx) => {
   const url = new URL(req.url);
 
   const remoteAddr = req.headers.get('X-Forwarded-For');
@@ -96,8 +96,7 @@ const handler = async (req) => {
   const ts = new Date().toISOString();
   console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
 
-  const session = await server.getSession(req);
-  console.log(session);
+  const session = ctx.session;
 
   if (session) {
     return new Response(html(session),{

@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
 
 const adminId = argv[2];
-console.log(adminId);
 
 const ERROR_CODE_NO_ERROR = 0;
 
@@ -19,86 +18,104 @@ function decode(valueBytes) {
   return JSON.parse(decoder.decode(valueBytes));
 }
 
+const wasmBytes = await readFile("./decent_auth.wasm");
+const module = await WebAssembly.compile(wasmBytes); 
 
-async function createHandler(kvStore) {
+async function createWasmPlugin(kvStore) {
 
-  const wasmBytes = await readFile("./decent_auth.wasm");
-  const module = await WebAssembly.compile(wasmBytes); 
+  const config = {
+      path_prefix: '/auth',
+      //id_header_name: 'Remote-Id',
+  };
 
-  async function handler(req) {
+  if (adminId) {
+    config.admin_id = adminId;
+  }
 
-    const config = {
-        path_prefix: '/auth',
-    };
-
-    if (adminId) {
-      config.admin_id = adminId;
-    }
-
-    const plugin = await createPlugin(
-      module,
-      {
-        runInWorker: true,
-        allowedHosts: ['*'],
-        logLevel: 'debug',
-        logger: console,
-        useWasi: true,
-        allowHttpResponseHeaders: true,
-        config,
-        functions: {
-          "extism:host/user": {
-            async kv_read(currentPlugin, offset) {
-              const key = currentPlugin.read(offset).text();
-              const value = await kvStore.get(key);
-              const valueBytes = encode(value);
-              const resultsArray = new Uint8Array(valueBytes.length + 1);
-              resultsArray[0] = ERROR_CODE_NO_ERROR;
-              resultsArray.set(valueBytes, 1);
-              return currentPlugin.store(resultsArray);
-            },
-            async kv_write(currentPlugin, keyOffset, valueOffset) {
-              const key = currentPlugin.read(keyOffset).text();
-              const valueBytes = currentPlugin.read(valueOffset);
-              const value = decode(valueBytes);
-              await kvStore.set(key, value);
-            },
-          }
-        },
+  const plugin = await createPlugin(
+    module,
+    {
+      runInWorker: true,
+      allowedHosts: ['*'],
+      logLevel: 'debug',
+      logger: console,
+      useWasi: true,
+      allowHttpResponseHeaders: true,
+      config,
+      functions: {
+        "extism:host/user": {
+          async kv_read(currentPlugin, offset) {
+            const key = currentPlugin.read(offset).text();
+            const value = await kvStore.get(key);
+            const valueBytes = encode(value);
+            const resultsArray = new Uint8Array(valueBytes.length + 1);
+            resultsArray[0] = ERROR_CODE_NO_ERROR;
+            resultsArray.set(valueBytes, 1);
+            return currentPlugin.store(resultsArray);
+          },
+          async kv_write(currentPlugin, keyOffset, valueOffset) {
+            const key = currentPlugin.read(keyOffset).text();
+            const valueBytes = currentPlugin.read(valueOffset);
+            const value = decode(valueBytes);
+            await kvStore.set(key, value);
+          },
+        }
       },
-    );
+    },
+  );
 
-    const headers = {};
+  return plugin;
+}
 
-    // TODO: handle headers with multiple values
-    for (const key of req.headers.keys()) {
-      if (!headers[key]) {
-        headers[key] = [];
-      }
-      headers[key].push(req.headers.get(key));
+async function callPluginFunction(funcName, kvStore, req) {
+  const plugin = await createWasmPlugin(kvStore);
+  const encReq = await encodePluginReq(req); 
+  const out = await plugin.call(funcName, encReq);
+  const pluginRes = out.json();
+  return pluginRes;
+}
+
+async function encodePluginReq(req) {
+
+  const headers = {};
+
+  // TODO: handle headers with multiple values
+  for (const key of req.headers.keys()) {
+    if (!headers[key]) {
+      headers[key] = [];
     }
+    headers[key].push(req.headers.get(key));
+  }
 
-    let body = '';
+  let body = '';
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      for await (const chunk of req.body) {
-        body += decoder.decode(chunk);
-      }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    for await (const chunk of req.body) {
+      body += decoder.decode(chunk);
     }
+  }
 
-    const pluginReq = {
-      url: req.url,
-      method: req.method,
-      headers,
-      // TODO: maybe use something other than JSON so we can send actual byte
-      // arrays
-      body,
-    };
+  const pluginReq = {
+    url: req.url,
+    method: req.method,
+    headers,
+    // TODO: maybe use something other than JSON so we can send actual byte
+    // arrays
+    body,
+  };
 
-    const encReq = JSON.stringify(pluginReq);
+  const encReq = JSON.stringify(pluginReq);
 
+  return encReq;
+}
+
+
+async function createWasmHandler(kvStore) {
+
+  async function handler(req) { 
+    
     try {
-      const out = await plugin.call("extism_handle", encReq);
-      const pluginRes = out.json();
+      const pluginRes = await callPluginFunction('extism_handle', kvStore, req);
 
       return new Response(pluginRes.body, {
         status: pluginRes.code,
@@ -170,5 +187,7 @@ function createNodeHandler(handler) {
 
 export {
   createNodeHandler,
-  createHandler,
+  createWasmHandler,
+  createWasmPlugin,
+  callPluginFunction,
 };

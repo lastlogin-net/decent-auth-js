@@ -1,7 +1,7 @@
 import { fediversePage, completeMastodonLogin } from './fediverse.js';
 import { atprotoLogin, atprotoClientMetadata, atprotoCallback, lookupDid } from './atproto.js';
 import { oidcLogin, oidcLoginWithMeta, oidcCallback, oidcClientMetadata } from './oidc.js';
-import { createNodeHandler, createHandler as createWasmHandler } from './wasm.js';
+import { createNodeHandler, callPluginFunction, createWasmHandler } from './wasm.js';
 
 class Server {
 
@@ -29,14 +29,18 @@ class Server {
 
     const wasmHandler = await createWasmHandler(this.#kvStore);
 
-    const internalHandler = (req) => {
+    const internalHandler = async (req) => {
       const url = new URL(req.url);
       if (url.pathname.startsWith(this.#prefix)) {
         //return authHandler(req);
         return wasmHandler(req);
       }
       else {
-        return handler(req);
+        const session = await callPluginFunction('extism_get_session', this.#kvStore, req);
+        const ctx = {
+          session,
+        };
+        return handler(req, ctx);
       }
     };
 
