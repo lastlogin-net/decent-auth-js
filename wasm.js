@@ -40,6 +40,7 @@ async function createWasmPlugin(kvStore) {
       logLevel: 'debug',
       logger: console,
       useWasi: true,
+      enableWasiOutput: true,
       allowHttpResponseHeaders: true,
       config,
       functions: {
