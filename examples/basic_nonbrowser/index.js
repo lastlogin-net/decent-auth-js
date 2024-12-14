@@ -42,14 +42,14 @@ async function createKvStore(path) {
   return kvStore;
 }
 
-function html(session) {
+function html(session, returnTarget) {
 
   let content;
   if (session) {
-    content = `<h1>Hi there ${session.id}</h1>\n<a href='${authPrefix}/logout'>Logout</a>`;
+    content = `<h1>Hi there ${session.id}</h1>\n<a href='${authPrefix}/logout?return_target=${returnTarget}'>Logout</a>`;
   }
   else {
-    content = `<h1>Hi there</h1>\n<a href='${authPrefix}'>Login</a>`;
+    content = `<h1>Hi there</h1>\n<a href='${authPrefix}?return_target=${returnTarget}'>Login</a>`;
   }
 
   return `
@@ -98,20 +98,12 @@ const handler = async (req, ctx) => {
 
   const session = ctx.session;
 
-  if (session) {
-    return new Response(html(session),{
-      headers: {
-        'Content-Type': 'text/html',
-      },
-    });
-  }
-  else {
-    return new Response(html(session),{
-      headers: {
-        'Content-Type': 'text/html',
-      },
-    });
-  }
+  return new Response(html(session, url.pathname),{
+    headers: {
+      'Content-Type': 'text/html',
+    },
+  });
+
 };
 
 server.serve(handler);
