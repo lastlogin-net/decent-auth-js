@@ -1,9 +1,6 @@
 import createPlugin from '@extism/extism';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { argv } from 'node:process';
-
-const adminId = argv[2];
 
 const ERROR_CODE_NO_ERROR = 0;
 
@@ -21,16 +18,7 @@ function decode(valueBytes) {
 const wasmBytes = await readFile("./decent_auth.wasm");
 const module = await WebAssembly.compile(wasmBytes); 
 
-async function createWasmPlugin(kvStore) {
-
-  const config = {
-      path_prefix: '/auth',
-      //id_header_name: 'Remote-Id',
-  };
-
-  if (adminId) {
-    config.admin_id = adminId;
-  }
+async function createWasmPlugin(config, kvStore) {
 
   const plugin = await createPlugin(
     module,
@@ -42,7 +30,9 @@ async function createWasmPlugin(kvStore) {
       useWasi: true,
       enableWasiOutput: true,
       allowHttpResponseHeaders: true,
-      config,
+      config: {
+        config: JSON.stringify(config),
+      },
       functions: {
         "extism:host/user": {
           async kv_read(currentPlugin, offset) {
@@ -68,8 +58,8 @@ async function createWasmPlugin(kvStore) {
   return plugin;
 }
 
-async function callPluginFunction(funcName, kvStore, req) {
-  const plugin = await createWasmPlugin(kvStore);
+async function callPluginFunction(funcName, config, kvStore, req) {
+  const plugin = await createWasmPlugin(config, kvStore);
   const encReq = await encodePluginReq(req); 
   const out = await plugin.call(funcName, encReq);
   const pluginRes = out.json();
@@ -111,12 +101,12 @@ async function encodePluginReq(req) {
 }
 
 
-async function createWasmHandler(kvStore) {
+async function createWasmHandler(config, kvStore) {
 
   async function handler(req) { 
     
     try {
-      const pluginRes = await callPluginFunction('extism_handle', kvStore, req);
+      const pluginRes = await callPluginFunction('extism_handle', config, kvStore, req);
 
       return new Response(pluginRes.body, {
         status: pluginRes.code,

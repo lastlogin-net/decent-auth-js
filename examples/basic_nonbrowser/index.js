@@ -1,5 +1,9 @@
 import fs from 'fs/promises';
 import * as decentauth from '../../index.js';
+import { argv } from 'node:process';
+
+
+const adminId = argv[2];
 
 const authPrefix = '/auth';
 
@@ -85,7 +89,26 @@ const kvStore = await createKvStore('./store.json');
 
 const server = new decentauth.Server({
   kvStore,
-  prefix: authPrefix,
+  config: {
+    admin_id: adminId,
+    path_prefix: authPrefix,
+    login_methods: [
+      {
+        name: "Admin Code",
+        type: "admin-code",
+      },
+      {
+        name: "ATProto",
+        type: "atproto",
+      },
+    ],
+    oidc_providers: [
+      {
+        name: "LastLogin",
+        uri: "https://lastlogin.net",
+      }
+    ],
+  },
 });
 
 const handler = async (req, ctx) => {

@@ -6,12 +6,12 @@ import { createNodeHandler, callPluginFunction, createWasmHandler } from './wasm
 class Server {
 
   #kvStore = null;
-  #prefix = null;
   #storagePrefix = 'decent_auth';
+  #config = null;
 
   constructor(opt) {
+    this.#config = opt?.config;
     this.#kvStore = opt?.kvStore;
-    this.#prefix = opt?.prefix;
   }
 
   async getSession(req) {
@@ -24,19 +24,19 @@ class Server {
     const http = await import('http');
 
     const authHandler = createHandler(this.#kvStore, {
-      prefix: this.#prefix,
+      prefix: this.#config.path_prefix,
     });
 
-    const wasmHandler = await createWasmHandler(this.#kvStore);
+    const wasmHandler = await createWasmHandler(this.#config, this.#kvStore);
 
     const internalHandler = async (req) => {
       const url = new URL(req.url);
-      if (url.pathname.startsWith(this.#prefix)) {
+      if (url.pathname.startsWith(this.#config.path_prefix)) {
         //return authHandler(req);
         return wasmHandler(req);
       }
       else {
-        const session = await callPluginFunction('extism_get_session', this.#kvStore, req);
+        const session = await callPluginFunction('extism_get_session', this.#config, this.#kvStore, req);
         const ctx = {
           session,
         };
