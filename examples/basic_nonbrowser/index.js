@@ -101,6 +101,10 @@ const server = new decentauth.Server({
         name: "ATProto",
         type: "atproto",
       },
+      {
+        name: "Fediverse",
+        type: "fediverse",
+      },
     ],
     oidc_providers: [
       {
