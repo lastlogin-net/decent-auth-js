@@ -18,7 +18,7 @@ class Server {
   }
 
   async serve(handler) {
-    const http = await import('http');
+    const http = await import('node:http');
 
     const authHandler = createHandler(this.#kvStore, {
       prefix: this.#config.path_prefix,

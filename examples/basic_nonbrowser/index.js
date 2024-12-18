@@ -1,4 +1,4 @@
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 import * as decentauth from '../../index.js';
 import { argv } from 'node:process';
 
