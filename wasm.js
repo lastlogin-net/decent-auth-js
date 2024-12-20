@@ -25,7 +25,7 @@ async function createWasmPlugin(config, kvStore) {
     {
       runInWorker: true,
       allowedHosts: ['*'],
-      logLevel: 'debug',
+      //logLevel: 'debug',
       logger: console,
       useWasi: true,
       enableWasiOutput: true,
@@ -63,6 +63,7 @@ async function callPluginFunction(funcName, config, kvStore, req) {
   const encReq = await encodePluginReq(req); 
   const out = await plugin.call(funcName, encReq);
   const pluginRes = out.json();
+  await plugin.close();
   return pluginRes;
 }
 
