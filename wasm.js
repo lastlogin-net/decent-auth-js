@@ -15,7 +15,7 @@ function decode(valueBytes) {
   return JSON.parse(decoder.decode(valueBytes));
 }
 
-const wasmBytes = await readFile("./decentauth.wasm");
+const wasmBytes = await readFile(`${import.meta.dirname}/decentauth.wasm`);
 const module = await WebAssembly.compile(wasmBytes); 
 
 async function createWasmPlugin(config, kvStore) {

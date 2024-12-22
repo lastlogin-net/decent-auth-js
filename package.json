@@ -1,6 +1,34 @@
 {
   "type": "module",
+  "name": "decent-auth",
+  "version": "0.3.0",
+  "main": "index.js",
   "dependencies": {
     "@extism/extism": "^2.0.0-rc10"
-  }
+  },
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lastlogin-net/decent-auth-js.git"
+  },
+  "keywords": [
+    "authentication",
+    "login",
+    "oidc",
+    "oauth2",
+    "atproto",
+    "fediverse"
+  ],
+  "author": "Anders Pitman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lastlogin-net/decent-auth-js/issues"
+  },
+  "homepage": "https://github.com/lastlogin-net/decent-auth-js#readme",
+  "description": ""
 }
