@@ -59,6 +59,10 @@ class KvStore {
     this.persist();
   }
 
+  list(prefix) {
+    return Object.keys(this._obj).filter(k => k.startsWith(prefix));
+  }
+
   delete(key) {
     delete this._obj[key];
     this.persist();
