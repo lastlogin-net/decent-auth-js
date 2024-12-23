@@ -84,6 +84,11 @@ class SqliteKvStore {
   async get(key) {
     const result = await this.#client.prepare(`SELECT value FROM ${this.#tableName} WHERE key = ?`)
       .get(key);
+
+    if (!result) {
+      return new Uint8Array();
+    }
+
     const value = new Uint8Array(result.value);
     return value;
   }
