@@ -1,4 +1,5 @@
 import { createNodeHandler, callPluginFunction, createWasmHandler } from './wasm.js';
+import { JsonKvStore, SqliteKvStore } from './kv.js';
 
 class Server {
 
@@ -44,35 +45,6 @@ class Server {
     };
 
     http.createServer(createNodeHandler(internalHandler)).listen(this.#port);
-  }
-}
-
-class KvStore {
-  constructor() {
-    this._obj = {};
-  }
-
-  get(key) {
-    return this._obj[key];
-  }
-
-  set(key, value) {
-    this._obj[key] = value;
-    this.persist();
-  }
-
-  list(prefix) {
-    return Object.keys(this._obj).filter(k => k.startsWith(prefix));
-  }
-
-  delete(key) {
-    delete this._obj[key];
-    this.persist();
-  }
-
-  persist() {
-    // noop
-    console.log(this._obj);
   }
 }
 
@@ -122,5 +94,6 @@ export {
   Server,
   createHandler,
   getSession,
-  KvStore,
+  JsonKvStore,
+  SqliteKvStore,
 };

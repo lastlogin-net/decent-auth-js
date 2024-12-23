@@ -4,7 +4,8 @@
   "version": "0.3.0",
   "main": "index.js",
   "dependencies": {
-    "@extism/extism": "^2.0.0-rc10"
+    "@extism/extism": "^2.0.0-rc10",
+    "@libsql/client": "^0.14.0"
   },
   "directories": {
     "example": "examples"

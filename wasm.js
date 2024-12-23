@@ -1,19 +1,9 @@
 import createPlugin from '@extism/extism';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { encode, decoder } from './utils.js';
 
 const ERROR_CODE_NO_ERROR = 0;
-
-const encoder = new TextEncoder();
-const decoder = new TextDecoder('utf-8');
-
-function encode(value) {
-  return encoder.encode(JSON.stringify(value));
-}
-
-function decode(valueBytes) {
-  return JSON.parse(decoder.decode(valueBytes));
-}
 
 const wasmBytes = await readFile(`${import.meta.dirname}/decentauth.wasm`);
 const module = await WebAssembly.compile(wasmBytes); 
@@ -37,8 +27,7 @@ async function createWasmPlugin(config, kvStore) {
         "extism:host/user": {
           async kv_read(currentPlugin, offset) {
             const key = currentPlugin.read(offset).text();
-            const value = await kvStore.get(key);
-            const valueBytes = encode(value);
+            const valueBytes = await kvStore.get(key);
             const resultsArray = new Uint8Array(valueBytes.length + 1);
             resultsArray[0] = ERROR_CODE_NO_ERROR;
             resultsArray.set(valueBytes, 1);
@@ -46,9 +35,8 @@ async function createWasmPlugin(config, kvStore) {
           },
           async kv_write(currentPlugin, keyOffset, valueOffset) {
             const key = currentPlugin.read(keyOffset).text();
-            const valueBytes = currentPlugin.read(valueOffset);
-            const value = decode(valueBytes);
-            await kvStore.set(key, value);
+            const valueDataView = currentPlugin.read(valueOffset);
+            await kvStore.set(key, valueDataView.buffer);
           },
           async kv_delete(currentPlugin, keyOffset, valueOffset) {
             const key = currentPlugin.read(keyOffset).text();

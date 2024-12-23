@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises';
 import * as decentauth from '../../index.js';
 import { argv } from 'node:process';
 
@@ -8,44 +7,6 @@ const port = argv[3] ? argv[3] : 3000;
 
 const authPrefix = '/auth';
 
-class JsonKvStore extends decentauth.KvStore {
-  constructor(path) {
-    super();
-    this._path = path;
-
-    this._readyPromise = new Promise(async (resolve, reject) => {
-      let text;
-      try {
-        text = await fs.readFile(path, { encoding: 'utf-8' });
-      }
-      catch (e) {
-        console.log(e);
-      }
-
-      if (!text) {
-        text = '{}';
-      }
-
-      this._obj = JSON.parse(text);
-      this.persist();
-      resolve();
-    });
-  }
-
-  get ready() {
-    return this._readyPromise;
-  }
-
-  async persist() {
-    return fs.writeFile(this._path, JSON.stringify(this._obj, null, 2));
-  }
-}
-
-async function createKvStore(path) {
-  const kvStore = new JsonKvStore(path);
-  await kvStore.ready;
-  return kvStore;
-}
 
 function html(session, returnTarget) {
 
@@ -86,7 +47,15 @@ function html(session, returnTarget) {
   `;
 }
 
-const kvStore = await createKvStore('./store.json');
+//const kvStore = new decentauth.JsonKvStore({
+//  path: 'db.json',
+//});
+
+const kvStore = new decentauth.SqliteKvStore({
+  path: './db.sqlite',
+});
+
+await kvStore.ready;
 
 const server = new decentauth.Server({
   port,
