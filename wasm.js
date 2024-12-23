@@ -36,7 +36,7 @@ async function createWasmPlugin(config, kvStore) {
           async kv_write(currentPlugin, keyOffset, valueOffset) {
             const key = currentPlugin.read(keyOffset).text();
             const valueDataView = currentPlugin.read(valueOffset);
-            await kvStore.set(key, valueDataView.buffer);
+            await kvStore.set(key, new Uint8Array(valueDataView.buffer));
           },
           async kv_delete(currentPlugin, keyOffset, valueOffset) {
             const key = currentPlugin.read(keyOffset).text();

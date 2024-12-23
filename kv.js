@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import * as libsql from '@libsql/client';
+import Database from 'libsql';
 import { encode, decode } from './utils.js';
 
 // TODO: JsonKvStore assumes that values can always be interpreted as JSON
@@ -62,18 +62,16 @@ class SqliteKvStore {
   #readyPromise
 
   constructor(opt) {
-    this.#client = libsql.createClient({
-      url: `file:${opt.path}`,
-    });
+    this.#client = new Database(`${opt.path}`);
 
     this.#tableName = 'kv';
     const tn = this.#tableName;
 
     this.#readyPromise = new Promise(async (resolve, reject) => {
 
-      await this.#client.batch([
-        `CREATE TABLE IF NOT EXISTS ${tn}(key TEXT NOT NULL PRIMARY KEY, value BLOB NOT NULL)`,
-      ]);
+      await this.#client.exec(
+        `CREATE TABLE IF NOT EXISTS ${tn}(key TEXT NOT NULL PRIMARY KEY, value BLOB NOT NULL)`
+      );
 
       resolve();
     });
@@ -84,42 +82,33 @@ class SqliteKvStore {
   }
 
   async get(key) {
-    const results = await this.#client.execute({
-      sql: `SELECT value FROM ${this.#tableName} WHERE key = ?`,
-      args: [key],
-    });
-
-    const buf = results.rows.length > 0 ? results.rows[0].value : [];
-    const value = new Uint8Array(buf);
+    const result = await this.#client.prepare(`SELECT value FROM ${this.#tableName} WHERE key = ?`)
+      .get(key);
+    const value = new Uint8Array(result.value);
     return value;
   }
 
   async set(key, value) {
-    const results = await this.#client.execute({
-      sql: `INSERT OR REPLACE INTO ${this.#tableName}(key, value) VALUES(?, ?)`,
-      args: [key, value],
-    });
+    const results = await this.#client.prepare(
+      `INSERT OR REPLACE INTO ${this.#tableName}(key, value) VALUES(?, ?)`
+    ).run([key, value]);
   }
 
   async list(prefix) {
-    const results = await this.#client.execute({
-      sql: `SELECT key FROM ${this.#tableName} WHERE key GLOB ? || '*'`,
-      args: [prefix],
-    });
+    const rows = await this.#client.prepare(`SELECT key FROM ${this.#tableName} WHERE key GLOB ? || '*'`)
+      .all(prefix);
 
-    if (results.rows.length < 1) {
+    if (rows.length < 1) {
       return [];
     }
 
-    const keys = results.rows.map(r => r.key);
+    const keys = rows.map(r => r.key);
     return keys;
   }
 
   async delete(key) {
-    const results = await this.#client.execute({
-      sql: `DELETE from ${this.#tableName} WHERE key = ?`,
-      args: [key],
-    });
+    const results = await this.#client.prepare(`DELETE from ${this.#tableName} WHERE key = ?`)
+      .run(key);
   }
 }
 
