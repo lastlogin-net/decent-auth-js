@@ -57,19 +57,19 @@ class JsonKvStore {
 
 class SqliteKvStore {
 
-  #client
+  #db
   #tableName
   #readyPromise
 
   constructor(opt) {
-    this.#client = new Database(`${opt.path}`);
+    this.#db = new Database(`${opt.path}`);
 
     this.#tableName = 'kv';
     const tn = this.#tableName;
 
     this.#readyPromise = new Promise(async (resolve, reject) => {
 
-      await this.#client.exec(
+      await this.#db.exec(
         `CREATE TABLE IF NOT EXISTS ${tn}(key TEXT NOT NULL PRIMARY KEY, value BLOB NOT NULL)`
       );
 
@@ -82,7 +82,7 @@ class SqliteKvStore {
   }
 
   async get(key) {
-    const result = await this.#client.prepare(`SELECT value FROM ${this.#tableName} WHERE key = ?`)
+    const result = await this.#db.prepare(`SELECT value FROM ${this.#tableName} WHERE key = ?`)
       .get(key);
 
     if (!result) {
@@ -94,13 +94,13 @@ class SqliteKvStore {
   }
 
   async set(key, value) {
-    const results = await this.#client.prepare(
+    const results = await this.#db.prepare(
       `INSERT OR REPLACE INTO ${this.#tableName}(key, value) VALUES(?, ?)`
     ).run([key, value]);
   }
 
   async list(prefix) {
-    const rows = await this.#client.prepare(`SELECT key FROM ${this.#tableName} WHERE key GLOB ? || '*'`)
+    const rows = await this.#db.prepare(`SELECT key FROM ${this.#tableName} WHERE key GLOB ? || '*'`)
       .all(prefix);
 
     if (rows.length < 1) {
@@ -112,7 +112,7 @@ class SqliteKvStore {
   }
 
   async delete(key) {
-    const results = await this.#client.prepare(`DELETE from ${this.#tableName} WHERE key = ?`)
+    const results = await this.#db.prepare(`DELETE from ${this.#tableName} WHERE key = ?`)
       .run(key);
   }
 }
