@@ -5,9 +5,11 @@ class Server {
   #kvStore = null;
   #storagePrefix = 'decent_auth';
   #config = null;
+  #port = 3000;
 
   constructor(opt) {
     this.#config = opt?.config;
+    this.#port = opt?.port;
     this.#kvStore = opt?.kvStore;
   }
 
@@ -41,7 +43,7 @@ class Server {
       }
     };
 
-    http.createServer(createNodeHandler(internalHandler)).listen(3000);
+    http.createServer(createNodeHandler(internalHandler)).listen(this.#port);
   }
 }
 

@@ -4,6 +4,7 @@ import { argv } from 'node:process';
 
 
 const adminId = argv[2];
+const port = argv[3] ? argv[3] : 3000;
 
 const authPrefix = '/auth';
 
@@ -88,6 +89,7 @@ function html(session, returnTarget) {
 const kvStore = await createKvStore('./store.json');
 
 const server = new decentauth.Server({
+  port,
   kvStore,
   config: {
     admin_id: adminId,
