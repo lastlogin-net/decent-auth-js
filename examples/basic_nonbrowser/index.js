@@ -65,23 +65,19 @@ const server = new decentauth.Server({
     path_prefix: authPrefix,
     login_methods: [
       {
-        name: "Admin Code",
-        type: "admin-code",
-      },
-      {
-        name: "ATProto",
-        type: "atproto",
-      },
-      {
-        name: "Fediverse",
-        type: "fediverse",
-      },
-    ],
-    oidc_providers: [
-      {
+        type: decentauth.LOGIN_METHOD_OIDC,
         name: "LastLogin",
         uri: "https://lastlogin.net",
-      }
+      },
+      {
+        type: decentauth.LOGIN_METHOD_ATPROTO,
+      },
+      {
+        type: decentauth.LOGIN_METHOD_FEDIVERSE,
+      },
+      {
+        type: decentauth.LOGIN_METHOD_ADMIN_CODE,
+      },
     ],
   },
 });

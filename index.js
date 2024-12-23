@@ -1,6 +1,11 @@
 import { createNodeHandler, callPluginFunction, createWasmHandler } from './wasm.js';
 import { JsonKvStore, SqliteKvStore } from './kv.js';
 
+const LOGIN_METHOD_ATPROTO = 'ATProto';
+const LOGIN_METHOD_FEDIVERSE = 'Fediverse';
+const LOGIN_METHOD_ADMIN_CODE = 'Admin Code';
+const LOGIN_METHOD_OIDC = 'OIDC';
+
 class Server {
 
   #kvStore;
@@ -100,6 +105,10 @@ function getCookie(req, name) {
 }
 
 export {
+  LOGIN_METHOD_ATPROTO,
+  LOGIN_METHOD_FEDIVERSE,
+  LOGIN_METHOD_ADMIN_CODE,
+  LOGIN_METHOD_OIDC,
   Server,
   createHandler,
   getSession,
