@@ -3,7 +3,7 @@ import { JsonKvStore, SqliteKvStore } from './kv.js';
 
 class Server {
 
-  #kvStore = null;
+  #kvStore;
   #storagePrefix = 'decent_auth';
   #config = null;
   #port = 3000;
@@ -12,6 +12,12 @@ class Server {
     this.#config = opt?.config;
     this.#port = opt?.port;
     this.#kvStore = opt?.kvStore;
+
+    if (!this.#kvStore) {
+      this.#kvStore = new SqliteKvStore({
+        path: './decentauth.sqlite',
+      });
+    }
   }
 
   async getSession(req) {
@@ -21,6 +27,9 @@ class Server {
   }
 
   async serve(handler) {
+
+    await this.#kvStore.ready;
+
     const http = await import('node:http');
 
     const authHandler = createHandler(this.#kvStore, {
