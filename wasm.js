@@ -45,7 +45,7 @@ async function createWasmPlugin(config, kvStore) {
           async kv_list(currentPlugin, offset) {
             const prefix = currentPlugin.read(offset).text();
             const keys = await kvStore.list(prefix);
-            const keysJsonBytes = encode(JSON.stringify(keys));
+            const keysJsonBytes = encode(keys);
             const resultsArray = new Uint8Array(keysJsonBytes.length + 1);
             resultsArray[0] = ERROR_CODE_NO_ERROR;
             resultsArray.set(keysJsonBytes, 1);
