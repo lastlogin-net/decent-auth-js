@@ -13,6 +13,7 @@ class Server {
   #storagePrefix = 'decent_auth';
   #config = null;
   #port = 3000;
+  #wasmHandlerPromise;
 
   constructor(opt) {
     this.#config = opt?.config;
@@ -24,12 +25,17 @@ class Server {
         path: './decentauth.sqlite',
       });
     }
+
+    this.#wasmHandlerPromise = createWasmHandler(this.#config, this.#kvStore);
   }
 
   async getSession(req) {
-    const sessionKey = getCookie(req, `${this.#storagePrefix}_session_key`);
-    const key = `/${this.#storagePrefix}/sessions/${sessionKey}`;
-    return await this.#kvStore.get(key)
+    return callPluginFunction('extism_get_session', this.#config, this.#kvStore, req);
+  }
+
+  async handle(req) {
+    const handler = await this.#wasmHandlerPromise;
+    return handler(req);
   }
 
   async serve(handler) {
@@ -42,13 +48,11 @@ class Server {
       prefix: this.#config.path_prefix,
     });
 
-    const wasmHandler = await createWasmHandler(this.#config, this.#kvStore);
-
     const internalHandler = async (req) => {
       const url = new URL(req.url);
       if (url.pathname.startsWith(this.#config.path_prefix)) {
         //return authHandler(req);
-        return wasmHandler(req);
+        return this.handle(req);
       }
       else {
         const session = await callPluginFunction('extism_get_session', this.#config, this.#kvStore, req);

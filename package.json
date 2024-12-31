@@ -31,5 +31,9 @@
     "url": "https://github.com/lastlogin-net/decent-auth-js/issues"
   },
   "homepage": "https://github.com/lastlogin-net/decent-auth-js#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.15"
+  }
 }
