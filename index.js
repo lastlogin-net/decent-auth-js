@@ -44,14 +44,9 @@ class Server {
 
     const http = await import('node:http');
 
-    const authHandler = createHandler(this.#kvStore, {
-      prefix: this.#config.path_prefix,
-    });
-
     const internalHandler = async (req) => {
       const url = new URL(req.url);
       if (url.pathname.startsWith(this.#config.path_prefix)) {
-        //return authHandler(req);
         return this.handle(req);
       }
       else {
@@ -70,23 +65,6 @@ class Server {
 async function getSession(req, kvStore) {
   const sessionKey = getCookie(req, 'session_key');
   return await kvStore.get(`sessions/${sessionKey}`)
-}
-
-function createHandler(kvStore, opt) {
-
-  let pathPrefix = opt?.prefix;
-
-  async function handler(req) {
-
-    const url = new URL(req.url);
-
-    const pathname = url.pathname.slice(pathPrefix.length);
-    const path = pathname ? pathname : '/';
-
-    return new Response("Not found", { status: 404 });
-  }
-
-  return handler;
 }
 
 function getCookie(req, name) {
@@ -116,7 +94,6 @@ export {
   LOGIN_METHOD_ADMIN_CODE,
   LOGIN_METHOD_OIDC,
   Server,
-  createHandler,
   getSession,
   JsonKvStore,
   SqliteKvStore,
