@@ -6,6 +6,7 @@ const LOGIN_METHOD_FEDIVERSE = 'Fediverse';
 const LOGIN_METHOD_QR_CODE = 'QR Code';
 const LOGIN_METHOD_ADMIN_CODE = 'Admin Code';
 const LOGIN_METHOD_OIDC = 'OIDC';
+const LOGIN_METHOD_EMAIL = 'Email';
 
 class Server {
 
@@ -93,6 +94,7 @@ export {
   LOGIN_METHOD_QR_CODE,
   LOGIN_METHOD_ADMIN_CODE,
   LOGIN_METHOD_OIDC,
+  LOGIN_METHOD_EMAIL,
   Server,
   getSession,
   JsonKvStore,

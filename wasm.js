@@ -2,6 +2,7 @@ import createPlugin from '@extism/extism';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { encode, decoder } from './utils.js';
+import { Emailer } from './email.js';
 
 const ERROR_CODE_NO_ERROR = 0;
 
@@ -9,6 +10,21 @@ const wasmBytes = await readFile(`${import.meta.dirname}/decentauth.wasm`);
 const module = await WebAssembly.compile(wasmBytes); 
 
 async function createWasmPlugin(config, kvStore) {
+
+  let emailer;
+  const smtp = config.smtp_config;
+
+  if (smtp) {
+    emailer = new Emailer({
+      host: smtp.server_address,
+      port: smtp.server_port,
+      secure: false,
+      auth: {
+        user: smtp.username,
+        pass: smtp.password,
+      },
+    });
+  }
 
   const plugin = await createPlugin(
     module,
@@ -50,6 +66,15 @@ async function createWasmPlugin(config, kvStore) {
             resultsArray[0] = ERROR_CODE_NO_ERROR;
             resultsArray.set(keysJsonBytes, 1);
             return currentPlugin.store(resultsArray);
+          },
+          async extism_send_email(currentPlugin, offset) {
+            if (emailer) {
+              const emailJson = currentPlugin.read(offset).text();
+              const msg = JSON.parse(emailJson);
+              // TODO: maybe should await, but we need to avoid timing attacks
+              // and everything in the wasm plugin is synchronous
+              emailer.sendEmail(msg);
+            }
           },
         }
       },
