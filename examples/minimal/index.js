@@ -35,6 +35,9 @@ const server = new decentauth.Server({
       {
         type: decentauth.LOGIN_METHOD_FEDIVERSE,
       },
+      {
+        type: decentauth.LOGIN_METHOD_FEDCM,
+      },
     ],
   },
 });

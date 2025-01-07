@@ -7,6 +7,7 @@ const LOGIN_METHOD_QR_CODE = 'QR Code';
 const LOGIN_METHOD_ADMIN_CODE = 'Admin Code';
 const LOGIN_METHOD_OIDC = 'OIDC';
 const LOGIN_METHOD_EMAIL = 'Email';
+const LOGIN_METHOD_FEDCM = 'FedCM';
 
 class Server {
 
@@ -95,6 +96,7 @@ export {
   LOGIN_METHOD_ADMIN_CODE,
   LOGIN_METHOD_OIDC,
   LOGIN_METHOD_EMAIL,
+  LOGIN_METHOD_FEDCM,
   Server,
   getSession,
   JsonKvStore,
