@@ -39,31 +39,6 @@ class Server {
   }
 }
 
-async function getSession(req, kvStore) {
-  const sessionKey = getCookie(req, 'session_key');
-  return await kvStore.get(`sessions/${sessionKey}`)
-}
-
-function getCookie(req, name) {
-
-  const cookiesText = req.headers.get('cookie');
-
-  if (!cookiesText) {
-    return null;
-  }
-
-  const allCookiesParts = cookiesText.split(';');
-
-  for (const cookie of allCookiesParts) {
-    const cookieText = cookie.trim();
-    const cookieParts = cookieText.split('=');
-
-    if (cookieParts[0] === name) {
-      return cookieParts.slice(1).join('=');
-    }
-  }
-}
-
 export {
   LOGIN_METHOD_ATPROTO,
   LOGIN_METHOD_FEDIVERSE,
@@ -73,7 +48,6 @@ export {
   LOGIN_METHOD_EMAIL,
   LOGIN_METHOD_FEDCM,
   Server,
-  getSession,
   JsonKvStore,
   SqliteKvStore,
 };
