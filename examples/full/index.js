@@ -3,21 +3,29 @@ import { argv } from 'node:process';
 import { serve } from '@hono/node-server';
 
 
-const port = argv[2] ? argv[2] : 3000;
-const adminId = argv[3];
+let argIdx = 2;
+const port = argv[argIdx] ? argv[argIdx] : 3000;
+const dbPath = argv[++argIdx];
+const adminId = argv[++argIdx];
 
 const authPrefix = '/auth';
 
+const kvStore = new decentauth.SqliteKvStore({
+  path: dbPath,
+});
+
 const authServer = new decentauth.Server({
+  kvStore,
   config: {
+    runtime: "JavaScript",
     admin_id: adminId,
     path_prefix: authPrefix,
     smtp_config: {
-      server_address: argv[4],
-      server_port: Number(argv[5]),
-      username: argv[6],
-      password: argv[7],
-      sender_email: argv[8],
+      server_address: argv[++argIdx],
+      server_port: Number(argv[++argIdx]),
+      username: argv[++argIdx],
+      password: argv[++argIdx],
+      sender_email: argv[++argIdx],
     },
     login_methods: [
       {
