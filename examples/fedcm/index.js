@@ -1,26 +1,31 @@
 import * as decentauth from '../../index.js';
 import { argv } from 'node:process';
+import { serve } from '@hono/node-server';
 
 const authPrefix = '/auth';
 
-const server = new decentauth.Server({
-  port: 3000,
+const authServer = new decentauth.Server({
   config: {
     path_prefix: authPrefix,
     login_methods: [
       {
         type: decentauth.LOGIN_METHOD_FEDCM,
-      },
+      }
     ],
   },
 });
 
-const handler = async (req, ctx) => {
-  const url = new URL(req.url);
+serve({
+  async fetch(req) {
+    const url = new URL(req.url);
 
-  const session = ctx.session;
+    if (url.pathname.startsWith(authPrefix)) {
+      return authServer.handle(req);
+    }
 
-  return Response.redirect(`${url.origin}${authPrefix}`, 303);
-};
+    console.log("Session:", await authServer.getSession(req));
 
-server.serve(handler);
+    return Response.redirect(`${url.origin}${authPrefix}`, 303);
+  },
+  port: 3000,
+});
