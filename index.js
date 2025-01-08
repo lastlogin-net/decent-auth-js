@@ -1,4 +1,4 @@
-import { createNodeHandler, callPluginFunction, createWasmHandler } from './wasm.js';
+import { callPluginFunction, createWasmHandler } from './wasm.js';
 import { JsonKvStore, SqliteKvStore } from './kv.js';
 
 const LOGIN_METHOD_ATPROTO = 'ATProto';
@@ -14,12 +14,10 @@ class Server {
   #kvStore;
   #storagePrefix = 'decent_auth';
   #config = null;
-  #port = 3000;
   #wasmHandlerPromise;
 
   constructor(opt) {
     this.#config = opt?.config;
-    this.#port = opt?.port;
     this.#kvStore = opt?.kvStore;
 
     if (!this.#kvStore) {
@@ -38,29 +36,6 @@ class Server {
   async handle(req) {
     const handler = await this.#wasmHandlerPromise;
     return handler(req);
-  }
-
-  async serve(handler) {
-
-    await this.#kvStore.ready;
-
-    const http = await import('node:http');
-
-    const internalHandler = async (req) => {
-      const url = new URL(req.url);
-      if (url.pathname.startsWith(this.#config.path_prefix)) {
-        return this.handle(req);
-      }
-      else {
-        const session = await callPluginFunction('extism_get_session', this.#config, this.#kvStore, req);
-        const ctx = {
-          session,
-        };
-        return handler(req, ctx);
-      }
-    };
-
-    http.createServer(createNodeHandler(internalHandler)).listen(this.#port);
   }
 }
 

@@ -151,60 +151,7 @@ async function createWasmHandler(config, kvStore) {
   return handler;
 }
 
-function createNodeHandler(handler) {
-  async function nodeHandler(nodeReq, nodeRes) {
-
-    const headers = {};
-    for (const key in nodeReq.headers) {
-      if (!headers[key]) {
-        headers[key] = [];
-      }
-      headers[key].push(nodeReq.headers[key]);
-    }
-
-    let body;
-    if (nodeReq.method !== 'GET' && nodeReq.method !== 'HEAD') {
-      // TODO: convert this into a readable stream
-      let data = '';
-      nodeReq.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      await new Promise((resolve, reject) => {
-        nodeReq.on('end', () => {
-          resolve();
-        });
-      });
-
-      body = data;
-    }
-
-    const host = headers.host || process.env.HOST || 'localhost';
-
-    const req = new Request(`http://${host}${nodeReq.url}`, {
-      method: nodeReq.method,
-      headers: nodeReq.headers,
-      body,
-    });
-
-    const res = await handler(req);
-
-    nodeRes.setHeaders(res.headers);
-    nodeRes.writeHead(res.status);
-
-    if (res.body) {
-      for await (const chunk of res.body) {
-        nodeRes.write(chunk);
-      }
-    }
-
-    nodeRes.end();
-  }
-  return nodeHandler;
-}
-
 export {
-  createNodeHandler,
   createWasmHandler,
   createWasmPlugin,
   callPluginFunction,
