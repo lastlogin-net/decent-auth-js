@@ -1,5 +1,6 @@
 import * as decentauth from '../../index.js';
 import { argv } from 'node:process';
+import { serve } from '@hono/node-server';
 
 
 const port = argv[2] ? argv[2] : 3000;
@@ -7,8 +8,7 @@ const adminId = argv[3];
 
 const authPrefix = '/auth';
 
-const server = new decentauth.Server({
-  port,
+const authServer = new decentauth.Server({
   config: {
     admin_id: adminId,
     path_prefix: authPrefix,
@@ -47,17 +47,15 @@ const server = new decentauth.Server({
   },
 });
 
-const handler = async (req, ctx) => {
-  const url = new URL(req.url);
+serve({
+  async fetch(req) {
+    const url = new URL(req.url);
 
-  const remoteAddr = req.headers.get('X-Forwarded-For');
+    if (url.pathname.startsWith(authPrefix)) {
+      return authServer.handle(req);
+    }
 
-  const ts = new Date().toISOString();
-  console.log(`${ts}\t${req.method}\t${remoteAddr}\t${url.host}\t${url.pathname}`);
-
-  const session = ctx.session;
-
-  return Response.redirect(`${url.origin}${authPrefix}`, 303);
-};
-
-server.serve(handler);
+    return Response.redirect(`${url.origin}${authPrefix}`, 303);
+  },
+  port,
+});
