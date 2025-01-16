@@ -30,7 +30,8 @@ class Server {
   }
 
   async getSession(req) {
-    return callPluginFunction('extism_get_session', this.#config, this.#kvStore, req);
+    const consumeBody = false;
+    return callPluginFunction('extism_get_session', this.#config, this.#kvStore, req, consumeBody);
   }
 
   async handle(req) {

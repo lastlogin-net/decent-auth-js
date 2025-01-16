@@ -84,16 +84,16 @@ async function createWasmPlugin(config, kvStore) {
   return plugin;
 }
 
-async function callPluginFunction(funcName, config, kvStore, req) {
+async function callPluginFunction(funcName, config, kvStore, req, consumeBody) {
   const plugin = await createWasmPlugin(config, kvStore);
-  const encReq = await encodePluginReq(req); 
+  const encReq = await encodePluginReq(req, consumeBody); 
   const out = await plugin.call(funcName, encReq);
   const pluginRes = out.json();
   await plugin.close();
   return pluginRes;
 }
 
-async function encodePluginReq(req) {
+async function encodePluginReq(req, consumeBody) {
 
   const headers = {};
 
@@ -107,7 +107,7 @@ async function encodePluginReq(req) {
 
   let body = '';
 
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
+  if (consumeBody && req.method !== 'GET' && req.method !== 'HEAD') {
     for await (const chunk of req.body) {
       body += decoder.decode(chunk);
     }
@@ -133,7 +133,8 @@ async function createWasmHandler(config, kvStore) {
   async function handler(req) { 
     
     try {
-      const pluginRes = await callPluginFunction('extism_handle', config, kvStore, req);
+      const consumeBody = true;
+      const pluginRes = await callPluginFunction('extism_handle', config, kvStore, req, consumeBody);
 
       return new Response(pluginRes.body, {
         status: pluginRes.code,
