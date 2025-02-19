@@ -20,6 +20,7 @@ const authServer = new decentauth.Server({
     runtime: "JavaScript",
     admin_id: adminId,
     path_prefix: authPrefix,
+    behind_proxy: true,
     smtp_config: {
       server_address: argv[++argIdx],
       server_port: Number(argv[++argIdx]),
@@ -57,6 +58,8 @@ const authServer = new decentauth.Server({
 
 serve({
   async fetch(req) {
+    return authServer.handle(req);
+
     const url = new URL(req.url);
 
     if (url.pathname.startsWith(authPrefix)) {
